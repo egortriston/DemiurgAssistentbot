@@ -1,11 +1,10 @@
 import asyncio
 import logging
 from aiogram import Bot, Dispatcher
-from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiohttp import web
 from config import BOT_TOKEN
-from database import Database
+from database import db
 from handlers import router
 from scheduler import setup_scheduler
 from payment_handler import setup_payment_routes
@@ -16,9 +15,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-# Глобальный экземпляр базы данных
-db = Database()
 
 async def on_startup(bot: Bot):
     """
@@ -39,12 +35,18 @@ async def on_startup(bot: Bot):
     
     setup_scheduler(bot)
     logger.info("Scheduler started")
+    
+    # Выполняем немедленную проверку истекших подписок при запуске
+    from scheduler import check_expired_subscriptions
+    logger.info("Performing initial check of expired subscriptions...")
+    await check_expired_subscriptions(bot)
+    logger.info("Initial check completed")
 
 async def main():
     """Main function"""
     try:
         # Initialize bot and dispatcher
-        bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+        bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
         dp = Dispatcher()
         
         # Register handlers

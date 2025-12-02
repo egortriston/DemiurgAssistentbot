@@ -1,12 +1,13 @@
 from aiohttp import web
-from database import Database
-from robokassa import verify_payment_signature, get_result_url_signature
+from database import db
+from robokassa import verify_payment_signature
 from handlers import process_payment_success
-from config import ROBOKASSA_PASSWORD_2
+from config import (
+    ROBOKASSA_CHANNEL_1_PASSWORD_2,
+    ROBOKASSA_CHANNEL_2_PASSWORD_2
+)
 from aiogram import Bot
 import os
-
-db = Database()
 
 async def robokassa_result_handler(request):
     """Handle Robokassa ResultURL (notification)"""
@@ -23,14 +24,24 @@ async def robokassa_result_handler(request):
     if not all([OutSum, InvId, SignatureValue]):
         return web.Response(text="ERROR: Missing parameters")
     
-    # Verify signature
-    if not verify_payment_signature(OutSum, InvId, SignatureValue, ROBOKASSA_PASSWORD_2):
-        return web.Response(text="ERROR: Invalid signature")
-    
-    # Get payment record
+    # Get payment record to determine channel
     payment = await db.get_payment(InvId)
     if not payment:
         return web.Response(text="ERROR: Payment not found")
+    
+    # Select correct password based on channel
+    channel_name = payment['channel_name']
+    if channel_name == "channel_1":
+        password_2 = ROBOKASSA_CHANNEL_1_PASSWORD_2
+    elif channel_name == "channel_2":
+        password_2 = ROBOKASSA_CHANNEL_2_PASSWORD_2
+    else:
+        return web.Response(text="ERROR: Unknown channel")
+    
+    # Verify signature with channel-specific password
+    if not verify_payment_signature(OutSum, InvId, SignatureValue, password_2):
+        return web.Response(text="ERROR: Invalid signature")
+    
     
     # Check if already processed
     if payment['status'] == 'success':
@@ -41,7 +52,6 @@ async def robokassa_result_handler(request):
     
     # Process payment success
     user_id = payment['telegram_id']
-    channel_name = payment['channel_name']
     
     try:
         await process_payment_success(user_id, channel_name, bot)

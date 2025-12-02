@@ -1,18 +1,26 @@
-BOT_TOKEN=your_telegram_bot_token_here
-ADMIN_IDS=123456789,987654321
-ROBOKASSA_MERCHANT_LOGIN=your_merchant_login
-ROBOKASSA_PASSWORD_1=your_password_1
-ROBOKASSA_PASSWORD_2=your_password_2
+BOT_TOKEN=8462885612:AAHZqTCfPyaSfQ1DwLBHf8OWXg06nTvolwE
+ADMIN_IDS=5882350650
+
+# Robokassa для канала "Орден Демиургов"
+ROBOKASSA_CHANNEL_1_MERCHANT_LOGIN=Uliya_Budagova
+ROBOKASSA_CHANNEL_1_PASSWORD_1=us0l067rAAUDfOaZmdy8
+ROBOKASSA_CHANNEL_1_PASSWORD_2=Ag1IG1EygyTR5FWrwJ96
+
+# Robokassa для канала "Родители Демиурги"
+ROBOKASSA_CHANNEL_2_MERCHANT_LOGIN=Uliya_Budagova
+ROBOKASSA_CHANNEL_2_PASSWORD_1=xneZUb6q9o42YQP7djVT
+ROBOKASSA_CHANNEL_2_PASSWORD_2=ib9ifg6ry3AmPivkc8B0
+
 ROBOKASSA_TEST_MODE=True
-CHANNEL_1_ID=@orden_demiurgov
-CHANNEL_2_ID=@roditeli_demiurgi
+CHANNEL_1_ID=-1003424698595
+CHANNEL_2_ID=-1003267567681
 
 # PostgreSQL Database Configuration
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=demiurg_bot
 DB_USER=postgres
-DB_PASSWORD=your_password
+DB_PASSWORD=1234
 
 SUPPORT_LINK=https://t.me/lnhvvu
 OFFER_LINK=https://disk.yandex.ru/client/disk/Договор%20оферты%20

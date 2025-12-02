@@ -366,21 +366,58 @@ class Database:
 
     async def get_expired_subscriptions(self) -> List[dict]:
         """
-        Получить истекшие подписки
+        Получить истекшие подписки (все активные подписки, у которых end_date прошла)
         
         ПОДКЛЮЧЕНИЕ: Получает соединение из пула, выполняет SELECT,
         возвращает соединение в пул.
         """
         async with self.pool.acquire() as conn:
+            now = datetime.now()
+            
+            # Сначала проверим все активные подписки для отладки
+            all_active = await conn.fetch("""
+                SELECT telegram_id, channel_name, end_date, is_active 
+                FROM subscriptions 
+                WHERE is_active = TRUE
+                ORDER BY end_date ASC
+            """)
+            print(f"[DB] Всего активных подписок: {len(all_active)}")
+            for sub in all_active:
+                sub_dict = dict(sub)
+                end_date = sub_dict['end_date']
+                if isinstance(end_date, str):
+                    end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                elif hasattr(end_date, 'replace'):
+                    end_date = end_date.replace(tzinfo=None)
+                print(f"  - User {sub_dict['telegram_id']}, channel {sub_dict['channel_name']}, end_date: {end_date} (now: {now}, expired: {end_date < now})")
+            
+            # Теперь ищем истекшие
             rows = await conn.fetch("""
                 SELECT * FROM subscriptions 
                 WHERE is_active = TRUE 
                 AND end_date < $1
-                AND payment_method = 'gift'
-            """, datetime.now())
-            return [dict(row) for row in rows]
+                ORDER BY end_date ASC
+            """, now)
+            result = [dict(row) for row in rows]
+            
+            # Логируем для отладки
+            if result:
+                print(f"[DB] ✅ Found {len(result)} expired subscriptions (current time: {now})")
+                for sub in result:
+                    end_date = sub['end_date']
+                    if isinstance(end_date, str):
+                        end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                    elif hasattr(end_date, 'replace'):
+                        end_date = end_date.replace(tzinfo=None)
+                    print(f"  - User {sub['telegram_id']}, channel {sub['channel_name']}, end_date: {end_date}")
+            else:
+                print(f"[DB] ❌ No expired subscriptions found (current time: {now})")
+            return result
 
     async def close(self):
         """Закрыть пул соединений"""
         if self.pool:
             await self.pool.close()
+
+# Глобальный экземпляр базы данных для использования во всех модулях
+db = Database()
