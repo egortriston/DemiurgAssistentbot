@@ -36,7 +36,10 @@ DB_PORT = int(os.getenv("DB_PORT", "5432"))
 DB_NAME = os.getenv("DB_NAME", "demiurg_bot")
 DB_USER = os.getenv("DB_USER", "postgres")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
-DB_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DB_URL = os.getenv(
+    "DB_URL",
+    f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+)
 
 # Links
 SUPPORT_LINK = os.getenv("SUPPORT_LINK", "https://t.me/lnhvvu")
@@ -50,4 +53,3 @@ CHANNEL_2_PRICE = int(os.getenv("CHANNEL_2_PRICE", "1990"))
 FREE_TRIAL_DAYS = 14
 PAID_SUBSCRIPTION_DAYS = 30
 REMINDER_DAYS_BEFORE = 3
-

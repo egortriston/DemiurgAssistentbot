@@ -16,6 +16,7 @@ CHANNEL_1_ID=-1003424698595
 CHANNEL_2_ID=-1003267567681
 
 # PostgreSQL Database Configuration
+DB_URL=postgresql://neondb_owner:npg_zDItsE5QPeF7@ep-wispy-boat-a9vxzqhl-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=demiurg_bot

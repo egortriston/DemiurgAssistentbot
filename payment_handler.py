@@ -8,19 +8,29 @@ from config import (
 )
 from aiogram import Bot
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 async def robokassa_result_handler(request):
     """Handle Robokassa ResultURL (notification)"""
     bot = request.app['bot']
     
+    logger.info(f"[Robokassa Result] Received callback request")
+    logger.info(f"[Robokassa Result] Headers: {dict(request.headers)}")
+    
     # Get parameters from request
     data = await request.post()
+    logger.info(f"[Robokassa Result] POST data: {dict(data)}")
     
     OutSum = data.get('OutSum', '')
     InvId = data.get('InvId', '')
     SignatureValue = data.get('SignatureValue', '')
     
+    logger.info(f"[Robokassa Result] OutSum={OutSum}, InvId={InvId}, Signature={SignatureValue}")
+    
     if not all([OutSum, InvId, SignatureValue]):
+        logger.error(f"[Robokassa Result] Missing parameters!")
         return web.Response(text="ERROR: Missing parameters")
     
     # Extract all shp_ parameters (must be in alphabetical order for signature)
@@ -28,11 +38,15 @@ async def robokassa_result_handler(request):
     for key, value in data.items():
         if key.startswith('Shp_'):
             shp_params[key] = value
+    logger.info(f"[Robokassa Result] Shp params: {shp_params}")
     
     # Get payment record to determine channel
     payment = await db.get_payment(InvId)
     if not payment:
+        logger.error(f"[Robokassa Result] Payment not found for InvId={InvId}")
         return web.Response(text="ERROR: Payment not found")
+    
+    logger.info(f"[Robokassa Result] Found payment: {payment}")
     
     # Select correct password based on channel
     channel_name = payment['channel_name']
@@ -41,18 +55,22 @@ async def robokassa_result_handler(request):
     elif channel_name == "channel_2":
         password_2 = ROBOKASSA_CHANNEL_2_PASSWORD_2
     else:
+        logger.error(f"[Robokassa Result] Unknown channel: {channel_name}")
         return web.Response(text="ERROR: Unknown channel")
     
     # Verify signature with channel-specific password and shp_ parameters
     if not verify_payment_signature(OutSum, InvId, SignatureValue, password_2, shp_params):
+        logger.error(f"[Robokassa Result] Invalid signature! Expected password2 for {channel_name}")
         return web.Response(text="ERROR: Invalid signature")
     
     
     # Check if already processed
     if payment['status'] == 'success':
+        logger.info(f"[Robokassa Result] Payment already processed, returning OK{InvId}")
         return web.Response(text=f"OK{InvId}")
     
     # Update payment status
+    logger.info(f"[Robokassa Result] Updating payment status to 'success'")
     await db.update_payment_status(InvId, 'success')
     
     # Process payment success
@@ -60,9 +78,11 @@ async def robokassa_result_handler(request):
     
     try:
         await process_payment_success(user_id, channel_name, bot)
+        logger.info(f"[Robokassa Result] Payment processed successfully for user {user_id}")
     except Exception as e:
-        print(f"Error processing payment: {e}")
+        logger.error(f"[Robokassa Result] Error processing payment: {e}")
     
+    logger.info(f"[Robokassa Result] Returning OK{InvId}")
     return web.Response(text=f"OK{InvId}")
 
 async def robokassa_success_handler(request):
