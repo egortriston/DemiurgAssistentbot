@@ -13,15 +13,18 @@ import logging
 logger = logging.getLogger(__name__)
 
 async def robokassa_result_handler(request):
-    """Handle Robokassa ResultURL (notification)"""
+    """Handle Robokassa ResultURL (notification) - supports both GET and POST"""
     bot = request.app['bot']
     
-    logger.info(f"[Robokassa Result] Received callback request")
+    logger.info(f"[Robokassa Result] Received callback request, method: {request.method}")
     logger.info(f"[Robokassa Result] Headers: {dict(request.headers)}")
     
-    # Get parameters from request
-    data = await request.post()
-    logger.info(f"[Robokassa Result] POST data: {dict(data)}")
+    # Get parameters from request (support both GET and POST)
+    if request.method == 'POST':
+        data = await request.post()
+    else:
+        data = request.query
+    logger.info(f"[Robokassa Result] Data: {dict(data)}")
     
     OutSum = data.get('OutSum', '')
     InvId = data.get('InvId', '')
@@ -103,7 +106,9 @@ async def robokassa_fail_handler(request):
 def setup_payment_routes(app: web.Application, bot: Bot):
     """Setup payment webhook routes"""
     app['bot'] = bot
+    # Support both GET and POST for ResultURL (Robokassa can use either)
     app.router.add_post('/robokassa/result', robokassa_result_handler)
+    app.router.add_get('/robokassa/result', robokassa_result_handler)
     app.router.add_get('/robokassa/success', robokassa_success_handler)
     app.router.add_get('/robokassa/fail', robokassa_fail_handler)
 
