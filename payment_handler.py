@@ -51,6 +51,13 @@ async def robokassa_result_handler(request):
     
     logger.info(f"[Robokassa Result] Found payment: {payment}")
     
+    # Verify payment amount matches (security check)
+    expected_amount = float(payment['amount'])
+    received_amount = float(OutSum)
+    if abs(expected_amount - received_amount) > 0.01:  # Allow small floating point differences
+        logger.error(f"[Robokassa Result] Amount mismatch! Expected {expected_amount}, received {received_amount}")
+        return web.Response(text="ERROR: Amount mismatch")
+    
     # Select correct password based on channel
     channel_name = payment['channel_name']
     if channel_name == "channel_1":
@@ -72,18 +79,21 @@ async def robokassa_result_handler(request):
         logger.info(f"[Robokassa Result] Payment already processed, returning OK{InvId}")
         return web.Response(text=f"OK{InvId}")
     
-    # Update payment status
-    logger.info(f"[Robokassa Result] Updating payment status to 'success'")
-    await db.update_payment_status(InvId, 'success')
-    
-    # Process payment success
+    # Process payment success FIRST (before updating status)
+    # This way if processing fails, we can retry later
     user_id = payment['telegram_id']
     
     try:
         await process_payment_success(user_id, channel_name, bot)
         logger.info(f"[Robokassa Result] Payment processed successfully for user {user_id}")
+        
+        # Only update status to success AFTER successful processing
+        await db.update_payment_status(InvId, 'success')
     except Exception as e:
         logger.error(f"[Robokassa Result] Error processing payment: {e}")
+        # Don't update status to success if processing failed
+        # Robokassa will retry the callback
+        return web.Response(text="ERROR: Processing failed")
     
     logger.info(f"[Robokassa Result] Returning OK{InvId}")
     return web.Response(text=f"OK{InvId}")

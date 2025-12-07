@@ -88,7 +88,7 @@ async def callback_main_menu(callback: CallbackQuery):
     await callback.answer()
 
 @router.callback_query(F.data == "channel_1_info")
-async def callback_channel_1_info(callback: CallbackQuery):
+async def callback_channel_1_info(callback: CallbackQuery, bot: Bot):
     """Handle channel 1 info callback"""
     user_id = callback.from_user.id
     
@@ -96,14 +96,31 @@ async def callback_channel_1_info(callback: CallbackQuery):
     active_sub = await db.get_active_subscription(user_id, "channel_1")
     
     if active_sub:
-        # User already has access - show their subscription info
+        # User already has access - show their subscription info with invite link
         end_date = active_sub['end_date']
         from messages import format_date
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        
+        # Create invite link for the channel
+        try:
+            invite_link = await bot.create_chat_invite_link(
+                chat_id=CHANNEL_1_ID,
+                member_limit=1,
+                name=f"Access {user_id}"
+            )
+            invite_url = invite_link.invite_link
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="Перейти в канал", url=invite_url)],
+                [InlineKeyboardButton(text="На главную", callback_data="main_menu")]
+            ])
+        except Exception as e:
+            logger.error(f"Failed to create invite link: {e}")
+            keyboard = get_back_to_main_keyboard()
+        
         await callback.message.edit_text(
             f"У вас уже есть активная подписка на канал \"Орден Демиургов\".\n\n"
-            f"Доступ активен до: {format_date(end_date)}\n\n"
-            f"Вы можете перейти в канал по ссылке, которая была отправлена при оплате.",
-            reply_markup=get_back_to_main_keyboard()
+            f"Доступ активен до: {format_date(end_date)}",
+            reply_markup=keyboard
         )
     else:
         await callback.message.edit_text(
@@ -113,7 +130,7 @@ async def callback_channel_1_info(callback: CallbackQuery):
     await callback.answer()
 
 @router.callback_query(F.data == "channel_2_info")
-async def callback_channel_2_info(callback: CallbackQuery):
+async def callback_channel_2_info(callback: CallbackQuery, bot: Bot):
     """Handle channel 2 info callback"""
     user_id = callback.from_user.id
     
@@ -121,14 +138,31 @@ async def callback_channel_2_info(callback: CallbackQuery):
     active_sub = await db.get_active_subscription(user_id, "channel_2")
     
     if active_sub:
-        # User already has access - show their subscription info
+        # User already has access - show their subscription info with invite link
         end_date = active_sub['end_date']
         from messages import format_date
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        
+        # Create invite link for the channel
+        try:
+            invite_link = await bot.create_chat_invite_link(
+                chat_id=CHANNEL_2_ID,
+                member_limit=1,
+                name=f"Access {user_id}"
+            )
+            invite_url = invite_link.invite_link
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="Перейти в канал", url=invite_url)],
+                [InlineKeyboardButton(text="На главную", callback_data="main_menu")]
+            ])
+        except Exception as e:
+            logger.error(f"Failed to create invite link: {e}")
+            keyboard = get_back_to_main_keyboard()
+        
         await callback.message.edit_text(
             f"У вас уже есть активная подписка на канал \"Родители Демиурги\".\n\n"
-            f"Доступ активен до: {format_date(end_date)}\n\n"
-            f"Вы можете перейти в канал по ссылке, которая была отправлена при оплате.",
-            reply_markup=get_back_to_main_keyboard()
+            f"Доступ активен до: {format_date(end_date)}",
+            reply_markup=keyboard
         )
     else:
         await callback.message.edit_text(
@@ -138,14 +172,52 @@ async def callback_channel_2_info(callback: CallbackQuery):
     await callback.answer()
 
 @router.callback_query(F.data == "my_subscriptions")
-async def callback_my_subscriptions(callback: CallbackQuery):
+async def callback_my_subscriptions(callback: CallbackQuery, bot: Bot):
     """Handle my subscriptions callback"""
     user_id = callback.from_user.id
     subscriptions = await db.get_user_subscriptions(user_id)
     
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    
+    # Create keyboard with invite links for active subscriptions
+    keyboard_buttons = []
+    now = datetime.now()
+    active_subs = []
+    for s in subscriptions:
+        if s['is_active']:
+            end_date = s['end_date']
+            # Handle both datetime and string formats
+            if isinstance(end_date, str):
+                end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            if end_date > now:
+                active_subs.append(s)
+    
+    for sub in active_subs:
+        channel_name = sub['channel_name']
+        channel_id = CHANNEL_1_ID if channel_name == "channel_1" else CHANNEL_2_ID
+        channel_display = "Орден Демиургов" if channel_name == "channel_1" else "Родители Демиурги"
+        
+        try:
+            invite_link = await bot.create_chat_invite_link(
+                chat_id=channel_id,
+                member_limit=1,
+                name=f"Access {user_id}"
+            )
+            keyboard_buttons.append([
+                InlineKeyboardButton(
+                    text=f"🔗 {channel_display}",
+                    url=invite_link.invite_link
+                )
+            ])
+        except Exception as e:
+            logger.error(f"Failed to create invite link for {channel_name}: {e}")
+    
+    keyboard_buttons.append([InlineKeyboardButton(text="На главную", callback_data="main_menu")])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+    
     await callback.message.edit_text(
         get_subscriptions_message(subscriptions),
-        reply_markup=get_back_to_main_keyboard()
+        reply_markup=keyboard
     )
     await callback.answer()
 
@@ -169,13 +241,33 @@ async def callback_payment(callback: CallbackQuery, bot: Bot):
     active_sub = await db.get_active_subscription(user_id, channel_name)
     if active_sub:
         from messages import format_date
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        
         channel_display = "Орден Демиургов" if channel_name == "channel_1" else "Родители Демиурги"
+        channel_id = CHANNEL_1_ID if channel_name == "channel_1" else CHANNEL_2_ID
         end_date = active_sub['end_date']
+        
+        # Create invite link for the channel
+        try:
+            invite_link = await bot.create_chat_invite_link(
+                chat_id=channel_id,
+                member_limit=1,
+                name=f"Access {user_id}"
+            )
+            invite_url = invite_link.invite_link
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="Перейти в канал", url=invite_url)],
+                [InlineKeyboardButton(text="На главную", callback_data="main_menu")]
+            ])
+        except Exception as e:
+            logger.error(f"Failed to create invite link: {e}")
+            keyboard = get_back_to_main_keyboard()
+        
         await callback.message.edit_text(
             f"У вас уже есть активная подписка на канал \"{channel_display}\".\n\n"
             f"Доступ активен до: {format_date(end_date)}\n\n"
             f"Повторная оплата не требуется.",
-            reply_markup=get_back_to_main_keyboard()
+            reply_markup=keyboard
         )
         await callback.answer()
         return
@@ -217,10 +309,20 @@ async def process_payment_success(user_id: int, channel_name: str, bot: Bot):
         amount = CHANNEL_2_PRICE
         channel_id = CHANNEL_2_ID
     
-    start_date = datetime.now()
-    end_date = start_date + timedelta(days=PAID_SUBSCRIPTION_DAYS)
+    # Check if user already has an active subscription - extend it instead of replacing
+    existing_sub = await db.get_active_subscription(user_id, channel_name)
     
-    # Create subscription
+    if existing_sub and existing_sub['end_date'] > datetime.now():
+        # Extend existing subscription
+        start_date = existing_sub['start_date']
+        end_date = existing_sub['end_date'] + timedelta(days=PAID_SUBSCRIPTION_DAYS)
+        logger.info(f"Extending subscription for user {user_id}, new end_date: {end_date}")
+    else:
+        # Create new subscription
+        start_date = datetime.now()
+        end_date = start_date + timedelta(days=PAID_SUBSCRIPTION_DAYS)
+    
+    # Create or update subscription
     await db.create_subscription(
         user_id, channel_name, "paid", start_date, end_date, is_active=True
     )
@@ -265,22 +367,30 @@ async def process_payment_success(user_id: int, channel_name: str, bot: Bot):
                 bonus_invite_url = None
             
             # Send message with bonus and invite links
-            await bot.send_message(
-                user_id,
-                get_payment_success_with_bonus_message(
-                    start_date, end_date, bonus_start, bonus_end,
-                    channel_invite_url, bonus_invite_url
-                ),
-                reply_markup=get_back_to_main_keyboard()
-            )
+            try:
+                await bot.send_message(
+                    user_id,
+                    get_payment_success_with_bonus_message(
+                        start_date, end_date, bonus_start, bonus_end,
+                        channel_invite_url, bonus_invite_url
+                    ),
+                    reply_markup=get_back_to_main_keyboard()
+                )
+            except Exception as e:
+                logger.error(f"Failed to send payment success message to user {user_id}: {e}")
+                # User might have blocked bot, but payment is still processed
             return
     
     # Regular payment success message with invite link
-    await bot.send_message(
-        user_id,
-        get_payment_success_message(channel_name, start_date, end_date, channel_invite_url),
-        reply_markup=get_back_to_main_keyboard()
-    )
+    try:
+        await bot.send_message(
+            user_id,
+            get_payment_success_message(channel_name, start_date, end_date, channel_invite_url),
+            reply_markup=get_back_to_main_keyboard()
+        )
+    except Exception as e:
+        logger.error(f"Failed to send payment success message to user {user_id}: {e}")
+        # User might have blocked bot, but payment is still processed
 
 # Admin handlers
 @router.message(Command("admin"))
