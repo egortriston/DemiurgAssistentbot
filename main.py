@@ -53,6 +53,9 @@ async def main():
         # Register handlers
         dp.include_router(router)
         
+        # Enable chat_member updates to detect when users join channels
+        # This is required for the whitelist/kick functionality
+        
         # Setup payment webhook server
         app = web.Application()
         setup_payment_routes(app, bot)

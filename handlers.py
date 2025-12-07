@@ -1,6 +1,6 @@
-from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
-from aiogram.filters import Command
+from aiogram import Router, F, Bot
+from aiogram.types import Message, CallbackQuery, ChatMemberUpdated
+from aiogram.filters import Command, ChatMemberUpdatedFilter, IS_MEMBER, IS_NOT_MEMBER
 from datetime import datetime, timedelta
 from typing import Optional
 import logging
@@ -77,6 +77,64 @@ async def cmd_start(message: Message, bot: Bot):
         get_start_message(),
         reply_markup=get_main_menu_keyboard()
     )
+
+@router.chat_member(ChatMemberUpdatedFilter(IS_NOT_MEMBER >> IS_MEMBER))
+async def handle_chat_member_joined(event: ChatMemberUpdated, bot: Bot):
+    """
+    Handle when someone joins a channel - verify they have active subscription
+    
+    IMPORTANT: Bot must be an admin in the channel with 'chat_member' updates enabled
+    to receive these events. This prevents unauthorized users from joining via shared links.
+    """
+    chat_id = event.chat.id
+    user_id = event.new_chat_member.user.id
+    
+    # Skip if bot itself (shouldn't happen, but safety check)
+    bot_info = await bot.get_me()
+    if user_id == bot_info.id:
+        return
+    
+    # Determine which channel this is (compare as strings to handle both int and str formats)
+    channel_name = None
+    if str(chat_id) == str(CHANNEL_1_ID):
+        channel_name = "channel_1"
+    elif str(chat_id) == str(CHANNEL_2_ID):
+        channel_name = "channel_2"
+    else:
+        return  # Not one of our channels, ignore
+    
+    logger.info(f"[CHAT_MEMBER] User {user_id} joined channel {channel_name}")
+    
+    # Check if user has active subscription
+    active_sub = await db.get_active_subscription(user_id, channel_name)
+    
+    # Check if user is whitelisted
+    is_whitelisted = await db.is_whitelisted(user_id, channel_name)
+    
+    if active_sub or is_whitelisted:
+        if active_sub:
+            logger.info(f"[CHAT_MEMBER] User {user_id} has active subscription for {channel_name}, allowing")
+        if is_whitelisted:
+            logger.info(f"[CHAT_MEMBER] User {user_id} is whitelisted for {channel_name}, allowing")
+        return  # User has subscription or is whitelisted, allow them to stay
+    
+    # User has no subscription and isn't whitelisted - kick them
+    logger.warning(f"[CHAT_MEMBER] User {user_id} joined {channel_name} without subscription, kicking")
+    try:
+        await bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+        logger.info(f"[CHAT_MEMBER] ✅ Kicked unauthorized user {user_id} from {channel_name}")
+        
+        # Try to notify user
+        try:
+            await bot.send_message(
+                user_id,
+                f"❌ Вы были исключены из канала, так как у вас нет активной подписки.\n\n"
+                f"Для доступа к каналу необходимо оплатить подписку через бота."
+            )
+        except:
+            pass  # User might have blocked bot
+    except Exception as e:
+        logger.error(f"[CHAT_MEMBER] ❌ Error kicking user {user_id} from {channel_name}: {e}")
 
 @router.callback_query(F.data == "main_menu")
 async def callback_main_menu(callback: CallbackQuery):
@@ -406,7 +464,11 @@ async def cmd_admin(message: Message):
         "/import_users - Импорт пользователей из мастер-класса\n"
         "Формат: /import_users 123456789 @username1 @username2\n"
         "Можно использовать telegram_id или @username\n\n"
-        "/check_expired - Проверить истекшие подписки (ручная проверка)"
+        "/check_expired - Проверить истекшие подписки (ручная проверка)\n\n"
+        "Whitelist (защита от исключения):\n"
+        "/whitelist_add <user_id> <channel_1|channel_2> - Добавить в whitelist\n"
+        "/whitelist_remove <user_id> <channel_1|channel_2> - Удалить из whitelist\n"
+        "/whitelist_view [channel_name] - Просмотреть whitelist (опционально: для конкретного канала)"
     )
 
 async def resolve_user_identifier(bot: Bot, identifier: str) -> Optional[int]:
@@ -600,4 +662,110 @@ async def cmd_check_expired(message: Message, bot: Bot):
     await check_expired_subscriptions(bot)
     
     await message.answer("✅ Проверка завершена. Результаты в логах.")
+
+@router.message(Command("whitelist_add"))
+async def cmd_whitelist_add(message: Message, bot: Bot):
+    """Add user to whitelist"""
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer("У вас нет доступа к этой команде.")
+        return
+    
+    parts = message.text.split()[1:]
+    if len(parts) < 2:
+        await message.answer("Формат: /whitelist_add <user_id> <channel_1|channel_2>\nПример: /whitelist_add 123456789 channel_1")
+        return
+    
+    user_identifier = parts[0]
+    channel_name = parts[1]
+    
+    if channel_name not in ["channel_1", "channel_2"]:
+        await message.answer("Канал должен быть channel_1 или channel_2")
+        return
+    
+    # Resolve user identifier
+    telegram_id = await resolve_user_identifier(bot, user_identifier)
+    if not telegram_id:
+        await message.answer(f"Не удалось найти пользователя: {user_identifier}")
+        return
+    
+    try:
+        await db.add_whitelist_user(telegram_id, channel_name)
+        channel_display = "Орден Демиургов" if channel_name == "channel_1" else "Родители Демиурги"
+        await message.answer(f"✅ Пользователь {telegram_id} добавлен в whitelist для канала \"{channel_display}\"")
+    except Exception as e:
+        logger.error(f"Error adding user to whitelist: {e}")
+        await message.answer(f"❌ Ошибка при добавлении в whitelist: {e}")
+
+@router.message(Command("whitelist_remove"))
+async def cmd_whitelist_remove(message: Message, bot: Bot):
+    """Remove user from whitelist"""
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer("У вас нет доступа к этой команде.")
+        return
+    
+    parts = message.text.split()[1:]
+    if len(parts) < 2:
+        await message.answer("Формат: /whitelist_remove <user_id> <channel_1|channel_2>\nПример: /whitelist_remove 123456789 channel_1")
+        return
+    
+    user_identifier = parts[0]
+    channel_name = parts[1]
+    
+    if channel_name not in ["channel_1", "channel_2"]:
+        await message.answer("Канал должен быть channel_1 или channel_2")
+        return
+    
+    # Resolve user identifier
+    telegram_id = await resolve_user_identifier(bot, user_identifier)
+    if not telegram_id:
+        await message.answer(f"Не удалось найти пользователя: {user_identifier}")
+        return
+    
+    try:
+        await db.remove_whitelist_user(telegram_id, channel_name)
+        channel_display = "Орден Демиургов" if channel_name == "channel_1" else "Родители Демиурги"
+        await message.answer(f"✅ Пользователь {telegram_id} удален из whitelist для канала \"{channel_display}\"")
+    except Exception as e:
+        logger.error(f"Error removing user from whitelist: {e}")
+        await message.answer(f"❌ Ошибка при удалении из whitelist: {e}")
+
+@router.message(Command("whitelist_view"))
+async def cmd_whitelist_view(message: Message):
+    """View whitelist users"""
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer("У вас нет доступа к этой команде.")
+        return
+    
+    parts = message.text.split()[1:]
+    channel_name = parts[0] if parts else None
+    
+    if channel_name and channel_name not in ["channel_1", "channel_2"]:
+        await message.answer("Канал должен быть channel_1 или channel_2, либо не указан для просмотра всех")
+        return
+    
+    try:
+        whitelist_users = await db.get_whitelist_users(channel_name)
+        
+        if not whitelist_users:
+            channel_text = f" для канала \"{channel_name}\"" if channel_name else ""
+            await message.answer(f"Whitelist пуст{channel_text}")
+            return
+        
+        message_text = "Whitelist пользователей:\n\n"
+        for user in whitelist_users:
+            telegram_id = user['telegram_id']
+            ch_name = user['channel_name']
+            username = user.get('username', 'N/A')
+            first_name = user.get('first_name', '')
+            created_at = user.get('created_at', '')
+            
+            channel_display = "Орден Демиургов" if ch_name == "channel_1" else "Родители Демиурги"
+            user_display = f"@{username}" if username != 'N/A' else f"{first_name} ({telegram_id})" if first_name else str(telegram_id)
+            
+            message_text += f"• {user_display} - {channel_display} (ID: {telegram_id})\n"
+        
+        await message.answer(message_text)
+    except Exception as e:
+        logger.error(f"Error viewing whitelist: {e}")
+        await message.answer(f"❌ Ошибка при просмотре whitelist: {e}")
 

@@ -88,6 +88,17 @@ class Database:
                 )
             """)
             
+            # Whitelist table - users who should never be kicked from channels
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS whitelist (
+                    id SERIAL PRIMARY KEY,
+                    telegram_id BIGINT NOT NULL REFERENCES users(telegram_id) ON DELETE CASCADE,
+                    channel_name VARCHAR(50) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(telegram_id, channel_name)
+                )
+            """)
+            
             # Создаем индексы для оптимизации
             await conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_subscriptions_active 
@@ -115,6 +126,11 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_reminders_pending 
                 ON reminders(reminder_date, reminder_sent) 
                 WHERE reminder_sent = FALSE
+            """)
+            
+            await conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_whitelist_telegram_id 
+                ON whitelist(telegram_id, channel_name)
             """)
 
     async def get_connection(self):
@@ -413,6 +429,83 @@ class Database:
             else:
                 print(f"[DB] ❌ No expired subscriptions found (current time: {now})")
             return result
+
+    async def add_whitelist_user(self, telegram_id: int, channel_name: str):
+        """
+        Добавить пользователя в whitelist (никогда не будет исключен из канала)
+        
+        ПОДКЛЮЧЕНИЕ: Получает соединение из пула, выполняет INSERT ... ON CONFLICT,
+        возвращает соединение в пул.
+        """
+        async with self.pool.acquire() as conn:
+            # Ensure user exists first
+            await conn.execute("""
+                INSERT INTO users (telegram_id)
+                VALUES ($1)
+                ON CONFLICT (telegram_id) DO NOTHING
+            """, telegram_id)
+            
+            # Add to whitelist
+            await conn.execute("""
+                INSERT INTO whitelist (telegram_id, channel_name)
+                VALUES ($1, $2)
+                ON CONFLICT (telegram_id, channel_name) DO NOTHING
+            """, telegram_id, channel_name)
+
+    async def remove_whitelist_user(self, telegram_id: int, channel_name: str):
+        """
+        Удалить пользователя из whitelist
+        
+        ПОДКЛЮЧЕНИЕ: Получает соединение из пула, выполняет DELETE,
+        возвращает соединение в пул.
+        """
+        async with self.pool.acquire() as conn:
+            await conn.execute("""
+                DELETE FROM whitelist 
+                WHERE telegram_id = $1 AND channel_name = $2
+            """, telegram_id, channel_name)
+
+    async def is_whitelisted(self, telegram_id: int, channel_name: str) -> bool:
+        """
+        Проверить, находится ли пользователь в whitelist
+        
+        ПОДКЛЮЧЕНИЕ: Получает соединение из пула, выполняет SELECT,
+        возвращает соединение в пул.
+        """
+        async with self.pool.acquire() as conn:
+            count = await conn.fetchval("""
+                SELECT COUNT(*) FROM whitelist 
+                WHERE telegram_id = $1 AND channel_name = $2
+            """, telegram_id, channel_name)
+            return count > 0
+
+    async def get_whitelist_users(self, channel_name: str = None) -> List[dict]:
+        """
+        Получить всех пользователей из whitelist
+        
+        ПОДКЛЮЧЕНИЕ: Получает соединение из пула, выполняет SELECT,
+        возвращает соединение в пул.
+        
+        Args:
+            channel_name: Если указан, возвращает только для этого канала. Если None, возвращает всех.
+        """
+        async with self.pool.acquire() as conn:
+            if channel_name:
+                rows = await conn.fetch("""
+                    SELECT w.*, u.username, u.first_name, u.last_name
+                    FROM whitelist w
+                    LEFT JOIN users u ON w.telegram_id = u.telegram_id
+                    WHERE w.channel_name = $1
+                    ORDER BY w.created_at DESC
+                """, channel_name)
+            else:
+                rows = await conn.fetch("""
+                    SELECT w.*, u.username, u.first_name, u.last_name
+                    FROM whitelist w
+                    LEFT JOIN users u ON w.telegram_id = u.telegram_id
+                    ORDER BY w.channel_name, w.created_at DESC
+                """)
+            return [dict(row) for row in rows]
 
     async def close(self):
         """Закрыть пул соединений"""

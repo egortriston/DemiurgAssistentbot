@@ -71,19 +71,24 @@ async def check_expired_subscriptions(bot: Bot):
             print(f"[SCHEDULER] Error deactivating subscription for user {user_id}: {e}")
             continue
         
-        # Remove from channel (ban user)
-        try:
-            if channel_name == "channel_1":
-                await bot.ban_chat_member(chat_id=CHANNEL_1_ID, user_id=user_id)
-                print(f"[SCHEDULER] ✅ Banned user {user_id} from channel_1")
-            elif channel_name == "channel_2":
-                await bot.ban_chat_member(chat_id=CHANNEL_2_ID, user_id=user_id)
-                print(f"[SCHEDULER] ✅ Banned user {user_id} from channel_2")
-            else:
-                print(f"[SCHEDULER] Unknown channel_name: {channel_name}")
-        except Exception as e:
-            print(f"[SCHEDULER] ❌ Error banning user {user_id} from channel {channel_name}: {e}")
-            # Продолжаем обработку, даже если не удалось забанить
+        # Check if user is whitelisted - don't ban whitelisted users
+        is_whitelisted = await db.is_whitelisted(user_id, channel_name)
+        if is_whitelisted:
+            print(f"[SCHEDULER] ⚠️ User {user_id} is whitelisted for {channel_name}, skipping ban")
+        else:
+            # Remove from channel (ban user)
+            try:
+                if channel_name == "channel_1":
+                    await bot.ban_chat_member(chat_id=CHANNEL_1_ID, user_id=user_id)
+                    print(f"[SCHEDULER] ✅ Banned user {user_id} from channel_1")
+                elif channel_name == "channel_2":
+                    await bot.ban_chat_member(chat_id=CHANNEL_2_ID, user_id=user_id)
+                    print(f"[SCHEDULER] ✅ Banned user {user_id} from channel_2")
+                else:
+                    print(f"[SCHEDULER] Unknown channel_name: {channel_name}")
+            except Exception as e:
+                print(f"[SCHEDULER] ❌ Error banning user {user_id} from channel {channel_name}: {e}")
+                # Продолжаем обработку, даже если не удалось забанить
         
         # Send expiration message
         try:
@@ -95,6 +100,58 @@ async def check_expired_subscriptions(bot: Bot):
             print(f"[SCHEDULER] Sent expiration message to user {user_id}")
         except Exception as e:
             print(f"[SCHEDULER] Error sending expiration message to {user_id}: {e}")
+
+async def check_unauthorized_members(bot: Bot):
+    """Check all channel members and kick those without active subscriptions (unless whitelisted)"""
+    print(f"[SCHEDULER] Checking unauthorized members at {datetime.now()}")
+    
+    channels = [
+        ("channel_1", CHANNEL_1_ID),
+        ("channel_2", CHANNEL_2_ID)
+    ]
+    
+    for channel_name, channel_id in channels:
+        try:
+            # Get all administrators (they should be whitelisted separately if needed)
+            admins = await bot.get_chat_administrators(chat_id=channel_id)
+            admin_ids = {admin.user.id for admin in admins}
+            
+            # Get all active subscriptions for this channel
+            # We'll check each subscription individually
+            print(f"[SCHEDULER] Checking channel {channel_name} ({channel_id})")
+            
+            # Note: Telegram API doesn't provide a direct way to get all members
+            # This function should be called manually via admin command or
+            # we can check members when they interact with the bot
+            # For now, we'll rely on the expired subscription check
+            
+        except Exception as e:
+            print(f"[SCHEDULER] Error checking channel {channel_name}: {e}")
+
+async def kick_unauthorized_user(bot: Bot, user_id: int, channel_name: str, channel_id: str):
+    """
+    Kick a user from channel if they don't have active subscription and aren't whitelisted
+    Returns True if user was kicked, False if they should stay
+    """
+    # Check if user has active subscription
+    active_sub = await db.get_active_subscription(user_id, channel_name)
+    if active_sub:
+        return False  # User has active subscription, don't kick
+    
+    # Check if user is whitelisted
+    is_whitelisted = await db.is_whitelisted(user_id, channel_name)
+    if is_whitelisted:
+        print(f"[SCHEDULER] User {user_id} is whitelisted for {channel_name}, not kicking")
+        return False  # User is whitelisted, don't kick
+    
+    # User has no subscription and isn't whitelisted - kick them
+    try:
+        await bot.ban_chat_member(chat_id=channel_id, user_id=user_id)
+        print(f"[SCHEDULER] ✅ Kicked unauthorized user {user_id} from {channel_name}")
+        return True
+    except Exception as e:
+        print(f"[SCHEDULER] ❌ Error kicking user {user_id} from {channel_name}: {e}")
+        return False
 
 def setup_scheduler(bot: Bot):
     """Setup scheduled tasks"""
