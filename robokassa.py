@@ -71,18 +71,26 @@ def generate_payment_url(amount: float, description: str, invoice_id: str = None
         'Description': description,
     }
     
-    # Create signature according to official documentation:
-    # Base: MerchantLogin:OutSum:InvId:Password1
-    # NOTE: InvId используется как СТРОКА в формуле подписи
-    # ВРЕМЕННО: убираем shp_ параметры для диагностики ошибки 29
-    signature_string = f"{merchant_login}:{amount_str}:{invoice_id}:{password_1}"
-    
-    # ВРЕМЕННО отключено: shp_ параметры могут вызывать ошибку 29
-    # Если без shp_ работает - значит проблема в обработке shp_ параметров
+    # Add shp_ parameters if provided (must be in alphabetical order)
     shp_params = {}
     if user_id:
-        # Оставляем user_id для записи в БД, но НЕ передаем в URL и НЕ включаем в подпись
-        pass
+        shp_params['Shp_user_id'] = str(user_id)
+    
+    # Add shp_ parameters to URL params (sorted alphabetically)
+    for key in sorted(shp_params.keys()):
+        params[key] = shp_params[key]
+    
+    # Create signature according to official documentation:
+    # Base: MerchantLogin:OutSum:InvId:Password1
+    # With shp_: MerchantLogin:OutSum:InvId:Password1:Shp_param1=value1:Shp_param2=value2
+    # Use integer InvId in signature
+    signature_string = f"{merchant_login}:{amount_str}:{invoice_id_int}:{password_1}"
+    
+    # Add shp_ parameters to signature in alphabetical order (if any)
+    if shp_params:
+        sorted_shp = sorted(shp_params.items())
+        shp_string = ':'.join([f"{key}={value}" for key, value in sorted_shp])
+        signature_string = f"{signature_string}:{shp_string}"
     
     signature = hashlib.md5(signature_string.encode('utf-8')).hexdigest()
     params['SignatureValue'] = signature
@@ -94,9 +102,12 @@ def generate_payment_url(amount: float, description: str, invoice_id: str = None
     logger.info(f"[Robokassa] Generating payment URL for channel: {channel_name}")
     logger.info(f"[Robokassa] MerchantLogin: '{merchant_login}' (length: {len(merchant_login)})")
     logger.info(f"[Robokassa] OutSum: '{amount_str}'")
-    logger.info(f"[Robokassa] InvId: '{invoice_id}'")
+    logger.info(f"[Robokassa] InvId: '{invoice_id}' (int: {invoice_id_int})")
     logger.info(f"[Robokassa] Test mode: {ROBOKASSA_TEST_MODE}")
-    logger.info(f"[Robokassa] ВРЕМЕННО: shp_ параметры отключены для диагностики")
+    if shp_params:
+        logger.info(f"[Robokassa] Shp params: {shp_params}")
+    else:
+        logger.info(f"[Robokassa] No shp_ parameters")
     logger.info(f"[Robokassa] Signature formula: {signature_string.replace(password_1, '***PASSWORD***')}")
     logger.info(f"[Robokassa] Password1 length: {len(password_1)} chars")
     logger.info(f"[Robokassa] Calculated signature: {signature}")
