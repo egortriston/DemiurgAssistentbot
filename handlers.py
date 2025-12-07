@@ -110,7 +110,7 @@ async def callback_channel_1_info(callback: CallbackQuery, bot: Bot):
             )
             invite_url = invite_link.invite_link
             keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="Перейти в канал", url=invite_url)],
+                [InlineKeyboardButton(text="🔗 Перейти в канал", url=invite_url)],
                 [InlineKeyboardButton(text="На главную", callback_data="main_menu")]
             ])
         except Exception as e:
@@ -152,7 +152,7 @@ async def callback_channel_2_info(callback: CallbackQuery, bot: Bot):
             )
             invite_url = invite_link.invite_link
             keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="Перейти в канал", url=invite_url)],
+                [InlineKeyboardButton(text="🔗 Перейти в канал", url=invite_url)],
                 [InlineKeyboardButton(text="На главную", callback_data="main_menu")]
             ])
         except Exception as e:
@@ -256,7 +256,7 @@ async def callback_payment(callback: CallbackQuery, bot: Bot):
             )
             invite_url = invite_link.invite_link
             keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="Перейти в канал", url=invite_url)],
+                [InlineKeyboardButton(text="🔗 Перейти в канал", url=invite_url)],
                 [InlineKeyboardButton(text="На главную", callback_data="main_menu")]
             ])
         except Exception as e:
@@ -555,7 +555,7 @@ async def cmd_import_users(message: Message, bot: Bot):
             from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
             if channel_link:
                 gift_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="📖 Перейти в канал «Орден Демиургов»", url=channel_link)],
+                    [InlineKeyboardButton(text="🔗 Перейти в канал «Орден Демиургов»", url=channel_link)],
                     [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
                 ])
             else:
