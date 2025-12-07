@@ -218,7 +218,7 @@ async def callback_channel_2_info(callback: CallbackQuery, bot: Bot):
             keyboard = get_back_to_main_keyboard()
         
         await callback.message.edit_text(
-            f"У вас уже есть активная подписка на канал \"Родители Демиурги\".\n\n"
+            f"У вас уже есть активная подписка на канал \"Родители Демиурга\".\n\n"
             f"Доступ активен до: {format_date(end_date)}",
             reply_markup=keyboard
         )
@@ -253,7 +253,7 @@ async def callback_my_subscriptions(callback: CallbackQuery, bot: Bot):
     for sub in active_subs:
         channel_name = sub['channel_name']
         channel_id = CHANNEL_1_ID if channel_name == "channel_1" else CHANNEL_2_ID
-        channel_display = "Орден Демиургов" if channel_name == "channel_1" else "Родители Демиурги"
+        channel_display = "Орден Демиургов" if channel_name == "channel_1" else "Родители Демиурга"
         
         try:
             invite_link = await bot.create_chat_invite_link(
@@ -301,7 +301,7 @@ async def callback_payment(callback: CallbackQuery, bot: Bot):
         from messages import format_date
         from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
         
-        channel_display = "Орден Демиургов" if channel_name == "channel_1" else "Родители Демиурги"
+        channel_display = "Орден Демиургов" if channel_name == "channel_1" else "Родители Демиурга"
         channel_id = CHANNEL_1_ID if channel_name == "channel_1" else CHANNEL_2_ID
         end_date = active_sub['end_date']
         
@@ -336,7 +336,7 @@ async def callback_payment(callback: CallbackQuery, bot: Bot):
         description = "Орден Демиургов - 1 месяц"
     else:
         amount = CHANNEL_2_PRICE
-        description = "Родители Демиурги - 1 месяц"
+        description = "Родители Демиурга - 1 месяц"
     
     # Generate payment URL with channel-specific credentials
     payment_url, invoice_id = generate_payment_url(amount, description, user_id=user_id, channel_name=channel_name)
@@ -690,7 +690,7 @@ async def cmd_whitelist_add(message: Message, bot: Bot):
     
     try:
         await db.add_whitelist_user(telegram_id, channel_name)
-        channel_display = "Орден Демиургов" if channel_name == "channel_1" else "Родители Демиурги"
+        channel_display = "Орден Демиургов" if channel_name == "channel_1" else "Родители Демиурга"
         await message.answer(f"✅ Пользователь {telegram_id} добавлен в whitelist для канала \"{channel_display}\"")
     except Exception as e:
         logger.error(f"Error adding user to whitelist: {e}")
@@ -723,7 +723,7 @@ async def cmd_whitelist_remove(message: Message, bot: Bot):
     
     try:
         await db.remove_whitelist_user(telegram_id, channel_name)
-        channel_display = "Орден Демиургов" if channel_name == "channel_1" else "Родители Демиурги"
+        channel_display = "Орден Демиургов" if channel_name == "channel_1" else "Родители Демиурга"
         await message.answer(f"✅ Пользователь {telegram_id} удален из whitelist для канала \"{channel_display}\"")
     except Exception as e:
         logger.error(f"Error removing user from whitelist: {e}")
@@ -759,7 +759,7 @@ async def cmd_whitelist_view(message: Message):
             first_name = user.get('first_name', '')
             created_at = user.get('created_at', '')
             
-            channel_display = "Орден Демиургов" if ch_name == "channel_1" else "Родители Демиурги"
+            channel_display = "Орден Демиургов" if ch_name == "channel_1" else "Родители Демиурга"
             user_display = f"@{username}" if username != 'N/A' else f"{first_name} ({telegram_id})" if first_name else str(telegram_id)
             
             message_text += f"• {user_display} - {channel_display} (ID: {telegram_id})\n"

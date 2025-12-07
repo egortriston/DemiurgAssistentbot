@@ -32,7 +32,7 @@ def get_expired_message() -> str:
 
 def get_payment_success_message(channel_name: str, start_date: datetime, end_date: datetime, invite_url: str = None) -> str:
     """Payment success message"""
-    channel_display = "Орден Демиургов" if channel_name == "channel_1" else "Родители Демиурги"
+    channel_display = "Орден Демиургов" if channel_name == "channel_1" else "Родители Демиурга"
     message = f"""🎉 Оплата успешно прошла! Добро пожаловать в канал "{channel_display}".
 
 Доступ активен: {format_date(start_date)} — {format_date(end_date)}"""
@@ -46,12 +46,12 @@ def get_payment_success_with_bonus_message(channel_start: datetime, channel_end:
                                           bonus_start: datetime, bonus_end: datetime,
                                           channel_invite_url: str = None, bonus_invite_url: str = None) -> str:
     """Payment success message with bonus gift"""
-    message = f"""🎉 Оплата успешно прошла! Добро пожаловать в канал "Родители Демиурги".
+    message = f"""🎉 Оплата успешно прошла! Добро пожаловать в канал "Родители Демиурга".
 
 Доступ активен: {format_date(channel_start)} — {format_date(channel_end)}"""
     
     if channel_invite_url:
-        message += f"\n\nСсылка для входа в канал \"Родители Демиурги\":\n{channel_invite_url}"
+        message += f"\n\nСсылка для входа в канал \"Родители Демиурга\":\n{channel_invite_url}"
     
     message += f"""
 
@@ -92,11 +92,11 @@ def get_channel_1_info_message() -> str:
  Доступ открывается сразу после оплаты 👇"""
 
 def get_channel_2_info_message() -> str:
-    """Channel 2 (Родители Демиурги) info message"""
-    return f"""👨‍👩‍👧 Родители Демиурги
+    """Channel 2 (Родители Демиурга) info message"""
+    return f"""👨‍👩‍👧 Родители Демиурга
 
 Здесь родители учатся видеть за поведением ребёнка его эмоции, понимать, что на самом деле стоит за «проявлениями».
-Родители Демиурги — это место, где можно остановиться, разобраться и выдохнуть.
+Родители Демиурга — это место, где можно остановиться, разобраться и выдохнуть.
 
 У нас вы сможете:
  — разобрать эмоции детей и свои собственные простым, понятным языком
@@ -116,7 +116,7 @@ def get_subscriptions_message(subscriptions: list) -> str:
     
     message = ""
     for sub in subscriptions:
-        channel_name = "Орден Демиургов" if sub['channel_name'] == 'channel_1' else "Родители Демиурги"
+        channel_name = "Орден Демиургов" if sub['channel_name'] == 'channel_1' else "Родители Демиурга"
         status = "Активна" if sub['is_active'] else "Не активирована"
         
         # Handle both datetime objects and strings

@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 -- FOREIGN KEY: Ссылка на пользователя (users.telegram_id)
 telegram_id BIGINT NOT NULL REFERENCES users (telegram_id) ON DELETE CASCADE,
 
--- Название канала: 'channel_1' (Орден Демиургов) или 'channel_2' (Родители Демиурги)
+-- Название канала: 'channel_1' (Орден Демиургов) или 'channel_2' (Родители Демиурга)
 channel_name VARCHAR(50) NOT NULL,
 
 -- Статус подписки: TRUE = активна, FALSE = неактивна
@@ -137,7 +137,7 @@ COMMENT ON
 TABLE users IS 'Основная информация о пользователях Telegram бота';
 
 COMMENT ON
-TABLE subscriptions IS 'Подписки пользователей на каналы (Орден Демиургов, Родители Демиурги)';
+TABLE subscriptions IS 'Подписки пользователей на каналы (Орден Демиургов, Родители Демиурга)';
 
 COMMENT ON TABLE payments IS 'Записи о платежах через Robokassa';
 
@@ -150,7 +150,7 @@ COMMENT ON COLUMN users.telegram_id IS 'Уникальный ID пользова
 COMMENT ON COLUMN users.gift_received IS 'Получил ли пользователь подарок из мастер-класса (2 недели бесплатного доступа)';
 
 -- Комментарии к полям таблицы subscriptions
-COMMENT ON COLUMN subscriptions.channel_name IS 'Название канала: channel_1 (Орден Демиургов) или channel_2 (Родители Демиурги)';
+COMMENT ON COLUMN subscriptions.channel_name IS 'Название канала: channel_1 (Орден Демиургов) или channel_2 (Родители Демиурга)';
 
 COMMENT ON COLUMN subscriptions.payment_method IS 'Метод получения подписки: gift (подарок) или paid (оплачено)';
 

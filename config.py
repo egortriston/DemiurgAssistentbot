@@ -13,7 +13,7 @@ ROBOKASSA_CHANNEL_1_MERCHANT_LOGIN = os.getenv("ROBOKASSA_CHANNEL_1_MERCHANT_LOG
 ROBOKASSA_CHANNEL_1_PASSWORD_1 = os.getenv("ROBOKASSA_CHANNEL_1_PASSWORD_1")
 ROBOKASSA_CHANNEL_1_PASSWORD_2 = os.getenv("ROBOKASSA_CHANNEL_1_PASSWORD_2")
 
-# Channel 2 (Родители Демиурги)
+# Channel 2 (Родители Демиурга)
 ROBOKASSA_CHANNEL_2_MERCHANT_LOGIN = os.getenv("ROBOKASSA_CHANNEL_2_MERCHANT_LOGIN")
 ROBOKASSA_CHANNEL_2_PASSWORD_1 = os.getenv("ROBOKASSA_CHANNEL_2_PASSWORD_1")
 ROBOKASSA_CHANNEL_2_PASSWORD_2 = os.getenv("ROBOKASSA_CHANNEL_2_PASSWORD_2")
@@ -28,7 +28,7 @@ ROBOKASSA_BASE_URL = "https://auth.robokassa.ru/Merchant/Index.aspx"
 
 # Channels
 CHANNEL_1_ID = os.getenv("CHANNEL_1_ID", "-1003424698595")  # Орден Демиургов
-CHANNEL_2_ID = os.getenv("CHANNEL_2_ID", "-1003267567681")  # Родители Демиурги
+CHANNEL_2_ID = os.getenv("CHANNEL_2_ID", "-1003267567681")  # Родители Демиурга
 
 # Database (PostgreSQL)
 DB_HOST = os.getenv("DB_HOST", "localhost")

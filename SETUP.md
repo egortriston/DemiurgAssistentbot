@@ -22,7 +22,7 @@ cp .env.example .env
 - `ROBOKASSA_PASSWORD_1` - Пароль #1 в Robokassa (для генерации подписи)
 - `ROBOKASSA_PASSWORD_2` - Пароль #2 в Robokassa (для проверки подписи)
 - `CHANNEL_1_ID` - ID или username канала "Орден Демиургов" (например: `@orden_demiurgov` или `-1001234567890`)
-- `CHANNEL_2_ID` - ID или username канала "Родители Демиурги" (например: `@roditeli_demiurgi` или `-1001234567890`)
+- `CHANNEL_2_ID` - ID или username канала "Родители Демиурга" (например: `@roditeli_demiurgi` или `-1001234567890`)
 
 ### Опциональные параметры:
 

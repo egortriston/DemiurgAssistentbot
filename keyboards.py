@@ -5,7 +5,7 @@ def get_main_menu_keyboard():
     """Main menu keyboard"""
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text='📖 Канал "Орден Демиургов"', callback_data='channel_1_info')],
-        [InlineKeyboardButton(text='👨‍👩‍👧 Канал "Родители Демиурги"', callback_data='channel_2_info')],
+        [InlineKeyboardButton(text='👨‍👩‍👧 Канал "Родители Демиурга"', callback_data='channel_2_info')],
         [InlineKeyboardButton(text='Мои подписки', callback_data='my_subscriptions')],
         [InlineKeyboardButton(text='❓ Помощь и поддержка', url=SUPPORT_LINK)],
         [InlineKeyboardButton(text='Юридическая информация', callback_data='legal_info')],
