@@ -3,7 +3,10 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 from datetime import datetime, timedelta
 from typing import Optional
+import logging
 from database import db
+
+logger = logging.getLogger(__name__)
 from keyboards import (
     get_main_menu_keyboard, get_payment_keyboard, get_reminder_keyboard,
     get_expired_keyboard, get_back_to_main_keyboard, get_legal_info_keyboard
@@ -87,19 +90,51 @@ async def callback_main_menu(callback: CallbackQuery):
 @router.callback_query(F.data == "channel_1_info")
 async def callback_channel_1_info(callback: CallbackQuery):
     """Handle channel 1 info callback"""
-    await callback.message.edit_text(
-        get_channel_1_info_message(),
-        reply_markup=get_payment_keyboard("channel_1")
-    )
+    user_id = callback.from_user.id
+    
+    # Check if user already has an active subscription
+    active_sub = await db.get_active_subscription(user_id, "channel_1")
+    
+    if active_sub:
+        # User already has access - show their subscription info
+        end_date = active_sub['end_date']
+        from messages import format_date
+        await callback.message.edit_text(
+            f"У вас уже есть активная подписка на канал \"Орден Демиургов\".\n\n"
+            f"Доступ активен до: {format_date(end_date)}\n\n"
+            f"Вы можете перейти в канал по ссылке, которая была отправлена при оплате.",
+            reply_markup=get_back_to_main_keyboard()
+        )
+    else:
+        await callback.message.edit_text(
+            get_channel_1_info_message(),
+            reply_markup=get_payment_keyboard("channel_1")
+        )
     await callback.answer()
 
 @router.callback_query(F.data == "channel_2_info")
 async def callback_channel_2_info(callback: CallbackQuery):
     """Handle channel 2 info callback"""
-    await callback.message.edit_text(
-        get_channel_2_info_message(),
-        reply_markup=get_payment_keyboard("channel_2")
-    )
+    user_id = callback.from_user.id
+    
+    # Check if user already has an active subscription
+    active_sub = await db.get_active_subscription(user_id, "channel_2")
+    
+    if active_sub:
+        # User already has access - show their subscription info
+        end_date = active_sub['end_date']
+        from messages import format_date
+        await callback.message.edit_text(
+            f"У вас уже есть активная подписка на канал \"Родители Демиурги\".\n\n"
+            f"Доступ активен до: {format_date(end_date)}\n\n"
+            f"Вы можете перейти в канал по ссылке, которая была отправлена при оплате.",
+            reply_markup=get_back_to_main_keyboard()
+        )
+    else:
+        await callback.message.edit_text(
+            get_channel_2_info_message(),
+            reply_markup=get_payment_keyboard("channel_2")
+        )
     await callback.answer()
 
 @router.callback_query(F.data == "my_subscriptions")
@@ -129,6 +164,21 @@ async def callback_payment(callback: CallbackQuery, bot: Bot):
     user_id = callback.from_user.id
     # Extract channel_name from "pay_channel_1" or "pay_channel_2"
     channel_name = callback.data.replace("pay_", "")  # channel_1 or channel_2
+    
+    # Check if user already has an active subscription
+    active_sub = await db.get_active_subscription(user_id, channel_name)
+    if active_sub:
+        from messages import format_date
+        channel_display = "Орден Демиургов" if channel_name == "channel_1" else "Родители Демиурги"
+        end_date = active_sub['end_date']
+        await callback.message.edit_text(
+            f"У вас уже есть активная подписка на канал \"{channel_display}\".\n\n"
+            f"Доступ активен до: {format_date(end_date)}\n\n"
+            f"Повторная оплата не требуется.",
+            reply_markup=get_back_to_main_keyboard()
+        )
+        await callback.answer()
+        return
     
     # Determine price and description
     if channel_name == "channel_1":
