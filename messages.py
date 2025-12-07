@@ -118,8 +118,27 @@ def get_subscriptions_message(subscriptions: list) -> str:
     for sub in subscriptions:
         channel_name = "Орден Демиургов" if sub['channel_name'] == 'channel_1' else "Родители Демиурги"
         status = "Активна" if sub['is_active'] else "Не активирована"
-        start_date = format_date(datetime.fromisoformat(sub['start_date'])) if sub['start_date'] else "—"
-        end_date = format_date(datetime.fromisoformat(sub['end_date'])) if sub['end_date'] else "—"
+        
+        # Handle both datetime objects and strings
+        if sub.get('start_date'):
+            if isinstance(sub['start_date'], datetime):
+                start_date = format_date(sub['start_date'])
+            elif isinstance(sub['start_date'], str):
+                start_date = format_date(datetime.fromisoformat(sub['start_date'].replace('Z', '+00:00')))
+            else:
+                start_date = "—"
+        else:
+            start_date = "—"
+        
+        if sub.get('end_date'):
+            if isinstance(sub['end_date'], datetime):
+                end_date = format_date(sub['end_date'])
+            elif isinstance(sub['end_date'], str):
+                end_date = format_date(datetime.fromisoformat(sub['end_date'].replace('Z', '+00:00')))
+            else:
+                end_date = "—"
+        else:
+            end_date = "—"
         
         message += f"""Канал: {channel_name}
 Статус подписки: {status}
