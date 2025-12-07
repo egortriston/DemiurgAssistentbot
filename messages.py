@@ -30,23 +30,39 @@ def get_expired_message() -> str:
     return """Ваш бесплатный период закончился. 
 Доступ отключён. Хотите вернуться?"""
 
-def get_payment_success_message(channel_name: str, start_date: datetime, end_date: datetime) -> str:
+def get_payment_success_message(channel_name: str, start_date: datetime, end_date: datetime, invite_url: str = None) -> str:
     """Payment success message"""
     channel_display = "Орден Демиургов" if channel_name == "channel_1" else "Родители Демиурги"
-    return f"""🎉 Оплата успешно прошла! Добро пожаловать в канал "{channel_display}".
+    message = f"""🎉 Оплата успешно прошла! Добро пожаловать в канал "{channel_display}".
 
 Доступ активен: {format_date(start_date)} — {format_date(end_date)}"""
+    
+    if invite_url:
+        message += f"\n\nСсылка для входа в канал:\n{invite_url}"
+    
+    return message
 
 def get_payment_success_with_bonus_message(channel_start: datetime, channel_end: datetime, 
-                                          bonus_start: datetime, bonus_end: datetime) -> str:
+                                          bonus_start: datetime, bonus_end: datetime,
+                                          channel_invite_url: str = None, bonus_invite_url: str = None) -> str:
     """Payment success message with bonus gift"""
-    return f"""🎉 Оплата успешно прошла! Добро пожаловать в канал "Родители Демиурги".
+    message = f"""🎉 Оплата успешно прошла! Добро пожаловать в канал "Родители Демиурги".
 
-Доступ активен: {format_date(channel_start)} — {format_date(channel_end)}
+Доступ активен: {format_date(channel_start)} — {format_date(channel_end)}"""
+    
+    if channel_invite_url:
+        message += f"\n\nСсылка для входа в канал \"Родители Демиурги\":\n{channel_invite_url}"
+    
+    message += f"""
 
 Вам доступен бонус: ПОДАРОК — 2 недели БЕСПЛАТНОГО доступа к каналу "Орден Демиургов"!
 
 Доступ в Орден Демиургов активен: {format_date(bonus_start)} — {format_date(bonus_end)}"""
+    
+    if bonus_invite_url:
+        message += f"\n\nСсылка для входа в канал \"Орден Демиургов\":\n{bonus_invite_url}"
+    
+    return message
 
 # Path 2: Regular users messages
 def get_start_message() -> str:

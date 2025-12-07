@@ -178,6 +178,18 @@ async def process_payment_success(user_id: int, channel_name: str, bot: Bot):
     # Add user to channel
     await add_user_to_channel(bot, user_id, channel_id)
     
+    # Create invite link for the paid channel
+    try:
+        invite_link = await bot.create_chat_invite_link(
+            chat_id=channel_id,
+            member_limit=1,  # Single-use invite
+            name=f"Payment {user_id}"
+        )
+        channel_invite_url = invite_link.invite_link
+    except Exception as e:
+        logger.error(f"Failed to create invite link for channel {channel_id}: {e}")
+        channel_invite_url = None
+    
     # Special case: if user paid for channel_2 and never had channel_1, give bonus
     if channel_name == "channel_2":
         has_ever_had_channel_1 = await db.has_ever_had_subscription(user_id, "channel_1")
@@ -190,20 +202,33 @@ async def process_payment_success(user_id: int, channel_name: str, bot: Bot):
             )
             await add_user_to_channel(bot, user_id, CHANNEL_1_ID)
             
-            # Send message with bonus
+            # Create invite link for bonus channel
+            try:
+                bonus_invite = await bot.create_chat_invite_link(
+                    chat_id=CHANNEL_1_ID,
+                    member_limit=1,
+                    name=f"Bonus {user_id}"
+                )
+                bonus_invite_url = bonus_invite.invite_link
+            except Exception as e:
+                logger.error(f"Failed to create bonus invite link: {e}")
+                bonus_invite_url = None
+            
+            # Send message with bonus and invite links
             await bot.send_message(
                 user_id,
                 get_payment_success_with_bonus_message(
-                    start_date, end_date, bonus_start, bonus_end
+                    start_date, end_date, bonus_start, bonus_end,
+                    channel_invite_url, bonus_invite_url
                 ),
                 reply_markup=get_back_to_main_keyboard()
             )
             return
     
-    # Regular payment success message
+    # Regular payment success message with invite link
     await bot.send_message(
         user_id,
-        get_payment_success_message(channel_name, start_date, end_date),
+        get_payment_success_message(channel_name, start_date, end_date, channel_invite_url),
         reply_markup=get_back_to_main_keyboard()
     )
 
