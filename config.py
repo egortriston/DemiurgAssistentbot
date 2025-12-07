@@ -42,9 +42,9 @@ DB_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 SUPPORT_LINK = os.getenv("SUPPORT_LINK", "https://t.me/lnhvvu")
 OFFER_LINK = os.getenv("OFFER_LINK", "https://disk.yandex.ru/client/disk/Договор%20оферты%20")
 
-# Prices
-CHANNEL_1_PRICE = 1990
-CHANNEL_2_PRICE = 1990
+# Prices (in rubles)
+CHANNEL_1_PRICE = int(os.getenv("CHANNEL_1_PRICE", "1990"))
+CHANNEL_2_PRICE = int(os.getenv("CHANNEL_2_PRICE", "1990"))
 
 # Subscription periods (in days)
 FREE_TRIAL_DAYS = 14

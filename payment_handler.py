@@ -19,10 +19,15 @@ async def robokassa_result_handler(request):
     OutSum = data.get('OutSum', '')
     InvId = data.get('InvId', '')
     SignatureValue = data.get('SignatureValue', '')
-    user_id = data.get('Shp_user_id', None)
     
     if not all([OutSum, InvId, SignatureValue]):
         return web.Response(text="ERROR: Missing parameters")
+    
+    # Extract all shp_ parameters (must be in alphabetical order for signature)
+    shp_params = {}
+    for key, value in data.items():
+        if key.startswith('Shp_'):
+            shp_params[key] = value
     
     # Get payment record to determine channel
     payment = await db.get_payment(InvId)
@@ -38,8 +43,8 @@ async def robokassa_result_handler(request):
     else:
         return web.Response(text="ERROR: Unknown channel")
     
-    # Verify signature with channel-specific password
-    if not verify_payment_signature(OutSum, InvId, SignatureValue, password_2):
+    # Verify signature with channel-specific password and shp_ parameters
+    if not verify_payment_signature(OutSum, InvId, SignatureValue, password_2, shp_params):
         return web.Response(text="ERROR: Invalid signature")
     
     
