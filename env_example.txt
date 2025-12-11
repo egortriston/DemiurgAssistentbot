@@ -1,30 +1,30 @@
-BOT_TOKEN=8426695898:AAFTG0PihAtaN09tPTBpG7X03GK5Sif0-XA
-ADMIN_IDS=5882350650
+BOT_TOKEN=
+ADMIN_IDS=
 
 # Robokassa для канала "Орден Демиургов" (БОЕВОЙ РЕЖИМ)
 ROBOKASSA_CHANNEL_1_MERCHANT_LOGIN=DemiurgAssistentbot
-ROBOKASSA_CHANNEL_1_PASSWORD_1=YdAY4cJOiKEj67N7bYw2
-ROBOKASSA_CHANNEL_1_PASSWORD_2=FWTlY142wytM5kAz3DIh
+ROBOKASSA_CHANNEL_1_PASSWORD_1=
+ROBOKASSA_CHANNEL_1_PASSWORD_2=
 
 # Robokassa для канала "Родители Демиурга"
 ROBOKASSA_CHANNEL_2_MERCHANT_LOGIN=DemiurgParents
-ROBOKASSA_CHANNEL_2_PASSWORD_1=kN09aHJJYZD8LoZ8yn6s
-ROBOKASSA_CHANNEL_2_PASSWORD_2=ho7B2cYdC5Q9Lywby8oT
+ROBOKASSA_CHANNEL_2_PASSWORD_1=
+ROBOKASSA_CHANNEL_2_PASSWORD_2=
 
 ROBOKASSA_TEST_MODE=True
-CHANNEL_1_ID=-1003424698595
-CHANNEL_2_ID=-1003267567681
+CHANNEL_1_ID=
+CHANNEL_2_ID=1
 
 # PostgreSQL Database Configuration
-DB_URL=postgresql://neondb_owner:npg_zDItsE5QPeF7@ep-wispy-boat-a9vxzqhl-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
+DB_URL=postgresql:
 DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=demiurg_bot
-DB_USER=postgres
-DB_PASSWORD=1234
+DB_PORT=
+DB_NAME=
+DB_USER=
+DB_PASSWORD=
 
-SUPPORT_LINK=https://t.me/lnhvvu
-OFFER_LINK=https://disk.yandex.ru/client/disk/Договор%20оферты%20
+SUPPORT_LINK=
+OFFER_LINK=
 
 # Prices for subscriptions (in rubles)
 CHANNEL_1_PRICE=1990
