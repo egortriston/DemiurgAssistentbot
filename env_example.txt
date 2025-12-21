@@ -29,3 +29,9 @@ OFFER_LINK=
 # Prices for subscriptions (in rubles)
 CHANNEL_1_PRICE=1990
 CHANNEL_2_PRICE=1990
+
+# Robokassa fiscalization (ФЗ-54) - Tax system (optional)
+# Only needed if merchant has multiple tax systems in account
+# Values: osn, usn_income, usn_income_outcome, esn, patent
+# Leave empty if merchant has only one tax system
+# ROBOKASSA_SNO=osn

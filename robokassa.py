@@ -2,7 +2,8 @@ import hashlib
 import time
 import random
 import logging
-from urllib.parse import urlencode
+import json
+from urllib.parse import urlencode, quote
 from config import (
     ROBOKASSA_CHANNEL_1_MERCHANT_LOGIN,
     ROBOKASSA_CHANNEL_1_PASSWORD_1,
@@ -11,10 +12,42 @@ from config import (
     ROBOKASSA_CHANNEL_2_PASSWORD_1,
     ROBOKASSA_CHANNEL_2_PASSWORD_2,
     ROBOKASSA_BASE_URL,
-    ROBOKASSA_TEST_MODE
+    ROBOKASSA_TEST_MODE,
+    ROBOKASSA_SNO
 )
 
 logger = logging.getLogger(__name__)
+
+def create_receipt(name: str, amount: float, sno: str = None) -> str:
+    """
+    Create Receipt JSON for Robokassa fiscalization (ФЗ-54)
+    
+    Args:
+        name: Product/service name (max 128 chars, no special symbols except Russian/English)
+        amount: Total amount in rubles
+        sno: Tax system (sno) - optional if only one type in merchant account
+    
+    Returns:
+        JSON string for Receipt parameter
+    """
+    receipt_data = {
+        "items": [
+            {
+                "name": name[:128],  # Max 128 chars
+                "quantity": 1,
+                "sum": round(amount, 2),
+                "payment_method": "full_payment",  # Полный расчет
+                "payment_object": "service",  # Услуга
+                "tax": "none"  # Без НДС (можно изменить на vat0, vat10, vat20 и т.д.)
+            }
+        ]
+    }
+    
+    # Add sno only if provided (optional if merchant has only one tax system)
+    if sno:
+        receipt_data["sno"] = sno
+    
+    return json.dumps(receipt_data, ensure_ascii=False)
 
 def generate_payment_url(amount: float, description: str, invoice_id: str = None, user_id: int = None, channel_name: str = None) -> str:
     """
@@ -63,12 +96,18 @@ def generate_payment_url(amount: float, description: str, invoice_id: str = None
     # Convert amount to format expected by Robokassa (e.g., 1990.00)
     amount_str = f"{amount:.2f}"
     
+    # Create Receipt JSON for fiscalization (ФЗ-54)
+    receipt_json = create_receipt(description, amount, ROBOKASSA_SNO)
+    # URL-encode Receipt for signature calculation (single encoding)
+    receipt_encoded = quote(receipt_json, safe='')
+    
     # Build URL parameters
     params = {
         'MerchantLogin': merchant_login,
         'OutSum': amount_str,
         'InvId': invoice_id,
         'Description': description,
+        'Receipt': receipt_json,  # Will be double-encoded for GET request
     }
     
     # Add shp_ parameters if provided (must be in alphabetical order)
@@ -81,10 +120,11 @@ def generate_payment_url(amount: float, description: str, invoice_id: str = None
         params[key] = shp_params[key]
     
     # Create signature according to official documentation:
-    # Base: MerchantLogin:OutSum:InvId:Password1
-    # With shp_: MerchantLogin:OutSum:InvId:Password1:Shp_param1=value1:Shp_param2=value2
+    # With Receipt: MerchantLogin:OutSum:InvId:Receipt:Password1
+    # With shp_: MerchantLogin:OutSum:InvId:Receipt:Password1:Shp_param1=value1:Shp_param2=value2
+    # Receipt must be URL-encoded (single encoding) for signature calculation
     # Use integer InvId in signature
-    signature_string = f"{merchant_login}:{amount_str}:{invoice_id_int}:{password_1}"
+    signature_string = f"{merchant_login}:{amount_str}:{invoice_id_int}:{receipt_encoded}:{password_1}"
     
     # Add shp_ parameters to signature in alphabetical order (if any)
     if shp_params:
@@ -103,6 +143,7 @@ def generate_payment_url(amount: float, description: str, invoice_id: str = None
     logger.info(f"[Robokassa] MerchantLogin: '{merchant_login}' (length: {len(merchant_login)})")
     logger.info(f"[Robokassa] OutSum: '{amount_str}'")
     logger.info(f"[Robokassa] InvId: '{invoice_id}' (int: {invoice_id_int})")
+    logger.info(f"[Robokassa] Receipt: {receipt_json}")
     logger.info(f"[Robokassa] Test mode: {ROBOKASSA_TEST_MODE}")
     if shp_params:
         logger.info(f"[Robokassa] Shp params: {shp_params}")
@@ -114,8 +155,18 @@ def generate_payment_url(amount: float, description: str, invoice_id: str = None
     if not ROBOKASSA_TEST_MODE:
         logger.warning(f"[Robokassa] ⚠️ ПРОДАКШН РЕЖИМ! Убедитесь, что используются РАБОЧИЕ пароли!")
     
-    # Build URL
-    url = f"{ROBOKASSA_BASE_URL}?{urlencode(params)}"
+    # Build URL with double-encoded Receipt for GET request
+    # According to Robokassa docs: for GET requests, Receipt must be URL-encoded twice
+    # urlencode() will encode once, so we pre-encode Receipt once more
+    url_params = {}
+    for key, value in params.items():
+        if key == 'Receipt':
+            # Pre-encode Receipt once (urlencode will encode again → double encoding for GET)
+            url_params[key] = receipt_encoded  # Already URL-encoded once
+        else:
+            url_params[key] = value
+    
+    url = f"{ROBOKASSA_BASE_URL}?{urlencode(url_params)}"
     
     logger.info(f"[Robokassa] Payment URL generated successfully (InvId: {invoice_id})")
     

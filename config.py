@@ -49,6 +49,12 @@ OFFER_LINK = os.getenv("OFFER_LINK", "https://disk.yandex.ru/client/disk/Дог�
 CHANNEL_1_PRICE = int(os.getenv("CHANNEL_1_PRICE", "1990"))
 CHANNEL_2_PRICE = int(os.getenv("CHANNEL_2_PRICE", "1990"))
 
+# Robokassa fiscalization (ФЗ-54) - Tax system
+# Optional: only needed if merchant has multiple tax systems
+# Values: osn, usn_income, usn_income_outcome, esn, patent
+# If None, will be omitted from Receipt (Robokassa will use default from merchant account)
+ROBOKASSA_SNO = os.getenv("ROBOKASSA_SNO", None)  # Set to None if not needed
+
 # Subscription periods (in days)
 FREE_TRIAL_DAYS = 14
 PAID_SUBSCRIPTION_DAYS = 30
