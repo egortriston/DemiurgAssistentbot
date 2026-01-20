@@ -118,36 +118,38 @@ async def handle_chat_member_joined(event: ChatMemberUpdated, bot: Bot):
     
     logger.info(f"[CHAT_MEMBER] User {user_id} joined channel {channel_name}")
     
+    # FIRST: Check if user is whitelisted (superuser - bypasses all checks)
+    is_whitelisted = await db.is_whitelisted(user_id, channel_name)
+    if is_whitelisted:
+        logger.info(f"[CHAT_MEMBER] User {user_id} is WHITELISTED for {channel_name} - allowing (superuser)")
+        await db.set_user_banned(user_id, channel_name, False)
+        return  # Whitelisted users ALWAYS allowed
+    
     # Check if user has active subscription
     active_sub = await db.get_active_subscription(user_id, channel_name)
-    
-    # Check if user is whitelisted
-    is_whitelisted = await db.is_whitelisted(user_id, channel_name)
-    
-    if active_sub or is_whitelisted:
-        if active_sub:
-            logger.info(f"[CHAT_MEMBER] User {user_id} has active subscription for {channel_name}, allowing")
-        if is_whitelisted:
-            logger.info(f"[CHAT_MEMBER] User {user_id} is whitelisted for {channel_name}, allowing")
-        return  # User has subscription or is whitelisted, allow them to stay
+    if active_sub:
+        logger.info(f"[CHAT_MEMBER] User {user_id} has active subscription for {channel_name}, allowing")
+        await db.set_user_banned(user_id, channel_name, False)
+        return  # User has valid subscription
     
     # User has no subscription and isn't whitelisted - kick them
-    logger.warning(f"[CHAT_MEMBER] User {user_id} joined {channel_name} without subscription, kicking")
+    logger.warning(f"[CHAT_MEMBER] User {user_id} joined {channel_name} without subscription and NOT whitelisted, kicking")
     try:
         await bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
-        logger.info(f"[CHAT_MEMBER] ✅ Kicked unauthorized user {user_id} from {channel_name}")
+        await db.set_user_banned(user_id, channel_name, True)
+        logger.info(f"[CHAT_MEMBER] Kicked unauthorized user {user_id} from {channel_name}")
         
         # Try to notify user
         try:
             await bot.send_message(
                 user_id,
-                f"❌ Вы были исключены из канала, так как у вас нет активной подписки.\n\n"
+                f"Вы были исключены из канала, так как у вас нет активной подписки.\n\n"
                 f"Для доступа к каналу необходимо оплатить подписку через бота."
             )
         except:
             pass  # User might have blocked bot
     except Exception as e:
-        logger.error(f"[CHAT_MEMBER] ❌ Error kicking user {user_id} from {channel_name}: {e}")
+        logger.error(f"[CHAT_MEMBER] Error kicking user {user_id} from {channel_name}: {e}")
 
 @router.callback_query(F.data == "main_menu")
 async def callback_main_menu(callback: CallbackQuery):

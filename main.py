@@ -38,13 +38,18 @@ async def on_startup(bot: Bot):
     logger.info("Scheduler started")
     
     # Выполняем проверку и верификацию всех подписок при запуске
-    from scheduler import check_expired_subscriptions, verify_all_subscriptions_on_startup
+    from scheduler import check_expired_subscriptions, verify_all_subscriptions_on_startup, unban_all_whitelisted_users
+    
+    # FIRST: Ensure all whitelisted users are unbanned (superusers)
+    logger.info("Ensuring all whitelisted users are unbanned...")
+    await unban_all_whitelisted_users(bot)
+    logger.info("Whitelist check completed")
     
     logger.info("Performing initial check of expired subscriptions...")
     await check_expired_subscriptions(bot)
     logger.info("Expired subscriptions check completed")
     
-    # Verify all users - ban those without active subscriptions
+    # Verify all users - ban those without active subscriptions (whitelist already protected)
     logger.info("Verifying all user subscriptions...")
     await verify_all_subscriptions_on_startup(bot)
     logger.info("User verification completed")

@@ -104,6 +104,35 @@ async def check_expired_subscriptions(bot: Bot):
                 # Still mark as banned in DB for tracking
                 await db.set_user_banned(user_id, channel_name, True)
 
+async def unban_all_whitelisted_users(bot: Bot):
+    """
+    Ensure ALL whitelisted users are unbanned. 
+    Whitelisted users are superusers - they should NEVER be banned.
+    """
+    logger.info("[STARTUP] Ensuring all whitelisted users are unbanned...")
+    
+    # Get all whitelisted users
+    whitelisted = await db.get_whitelist_users()
+    
+    unbanned_count = 0
+    for user in whitelisted:
+        user_id = user['telegram_id']
+        channel_name = user['channel_name']
+        channel_id = CHANNEL_1_ID if channel_name == "channel_1" else CHANNEL_2_ID
+        
+        try:
+            # Unban the user (in case they were banned)
+            await bot.unban_chat_member(chat_id=channel_id, user_id=user_id, only_if_banned=True)
+            # Update database
+            await db.set_user_banned(user_id, channel_name, False)
+            unbanned_count += 1
+            logger.info(f"[STARTUP] Ensured whitelisted user {user_id} is unbanned from {channel_name}")
+        except Exception as e:
+            logger.warning(f"[STARTUP] Could not unban whitelisted user {user_id} from {channel_name}: {e}")
+    
+    logger.info(f"[STARTUP] Whitelist check complete: processed {unbanned_count} whitelisted users")
+
+
 async def verify_all_subscriptions_on_startup(bot: Bot):
     """
     Verify all users on bot startup.
