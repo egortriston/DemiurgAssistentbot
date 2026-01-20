@@ -101,6 +101,27 @@ reminder_date TIMESTAMP NOT NULL,
 UNIQUE(telegram_id, channel_name) );
 
 -- =====================================================
+-- 6. ТАБЛИЦА channel_memberships (статус участия в каналах)
+-- =====================================================
+-- Отслеживание статуса бана пользователей в каналах
+CREATE TABLE IF NOT EXISTS channel_memberships (
+    -- Составной PRIMARY KEY: один статус на пользователя и канал
+    telegram_id BIGINT NOT NULL,
+    channel_name VARCHAR(50) NOT NULL,
+    
+    -- Статус бана: TRUE = забанен, FALSE = не забанен
+    is_banned BOOLEAN DEFAULT FALSE,
+    
+    -- Дата и время бана (NULL если не забанен)
+    banned_at TIMESTAMP,
+    
+    -- Дата последней проверки статуса
+    last_verified TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    PRIMARY KEY (telegram_id, channel_name)
+);
+
+-- =====================================================
 -- ИНДЕКСЫ ДЛЯ ОПТИМИЗАЦИИ ЗАПРОСОВ
 -- =====================================================
 
@@ -128,6 +149,11 @@ CREATE INDEX IF NOT EXISTS idx_payments_telegram_id ON payments (telegram_id);
 CREATE INDEX IF NOT EXISTS idx_reminders_pending ON reminders (reminder_date, reminder_sent)
 WHERE
     reminder_sent = FALSE;
+
+-- Индекс для поиска забаненных пользователей
+CREATE INDEX IF NOT EXISTS idx_channel_memberships_banned ON channel_memberships (channel_name, is_banned)
+WHERE
+    is_banned = TRUE;
 
 -- =====================================================
 -- КОММЕНТАРИИ К ТАБЛИЦАМ
@@ -165,3 +191,16 @@ COMMENT ON COLUMN payments.status IS 'Статус платежа: pending, succ
 COMMENT ON COLUMN reminders.reminder_date IS 'Дата и время отправки напоминания (обычно за 3 дня до окончания подписки)';
 
 COMMENT ON COLUMN reminders.reminder_sent IS 'Отправлено ли напоминание пользователю';
+
+-- Комментарии к таблице channel_memberships
+COMMENT ON TABLE channel_memberships IS 'Статус участия пользователей в каналах (бан/не бан)';
+
+COMMENT ON COLUMN channel_memberships.telegram_id IS 'ID пользователя в Telegram';
+
+COMMENT ON COLUMN channel_memberships.channel_name IS 'Название канала: channel_1 (Орден Демиургов) или channel_2 (Родители Демиурга)';
+
+COMMENT ON COLUMN channel_memberships.is_banned IS 'Забанен ли пользователь в канале';
+
+COMMENT ON COLUMN channel_memberships.banned_at IS 'Дата и время бана (NULL если не забанен)';
+
+COMMENT ON COLUMN channel_memberships.last_verified IS 'Дата последней проверки статуса пользователя';

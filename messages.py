@@ -30,6 +30,15 @@ def get_expired_message() -> str:
     return """Ваш бесплатный период закончился. 
 Доступ отключён. Хотите вернуться?"""
 
+def get_subscription_ended_message(channel_name: str) -> str:
+    """Message when subscription has ended and user is banned from channel"""
+    channel_display = "Орден Демиургов" if channel_name == "channel_1" else "Родители Демиурга"
+    return f"""Ваша подписка на канал "{channel_display}" закончилась.
+
+Доступ к каналу отключен.
+
+Чтобы продолжить доступ к материалам канала, вы можете продлить подписку."""
+
 def get_payment_success_message(channel_name: str, start_date: datetime, end_date: datetime, invite_url: str = None) -> str:
     """Payment success message"""
     channel_display = "Орден Демиургов" if channel_name == "channel_1" else "Родители Демиурга"

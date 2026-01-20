@@ -99,6 +99,18 @@ class Database:
                 )
             """)
             
+            # Channel memberships table - tracks user ban status per channel
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS channel_memberships (
+                    telegram_id BIGINT NOT NULL,
+                    channel_name VARCHAR(50) NOT NULL,
+                    is_banned BOOLEAN DEFAULT FALSE,
+                    banned_at TIMESTAMP,
+                    last_verified TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (telegram_id, channel_name)
+                )
+            """)
+            
             # Создаем индексы для оптимизации
             await conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_subscriptions_active 
@@ -131,6 +143,12 @@ class Database:
             await conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_whitelist_telegram_id 
                 ON whitelist(telegram_id, channel_name)
+            """)
+            
+            await conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_channel_memberships_banned 
+                ON channel_memberships(channel_name, is_banned)
+                WHERE is_banned = TRUE
             """)
 
     async def get_connection(self):
@@ -504,6 +522,100 @@ class Database:
                     FROM whitelist w
                     LEFT JOIN users u ON w.telegram_id = u.telegram_id
                     ORDER BY w.channel_name, w.created_at DESC
+                """)
+            return [dict(row) for row in rows]
+
+    # ==================== CHANNEL MEMBERSHIPS (BAN STATUS) ====================
+    
+    async def set_user_banned(self, telegram_id: int, channel_name: str, is_banned: bool):
+        """
+        Set user ban status for a channel
+        
+        ПОДКЛЮЧЕНИЕ: Получает соединение из пула, выполняет INSERT ... ON CONFLICT,
+        возвращает соединение в пул.
+        """
+        async with self.pool.acquire() as conn:
+            now = datetime.now()
+            await conn.execute("""
+                INSERT INTO channel_memberships (telegram_id, channel_name, is_banned, banned_at, last_verified)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (telegram_id, channel_name) 
+                DO UPDATE SET 
+                    is_banned = EXCLUDED.is_banned,
+                    banned_at = CASE WHEN EXCLUDED.is_banned = TRUE THEN EXCLUDED.banned_at ELSE NULL END,
+                    last_verified = EXCLUDED.last_verified
+            """, telegram_id, channel_name, is_banned, now if is_banned else None, now)
+
+    async def is_user_banned(self, telegram_id: int, channel_name: str) -> bool:
+        """
+        Check if user is banned from a channel
+        
+        ПОДКЛЮЧЕНИЕ: Получает соединение из пула, выполняет SELECT,
+        возвращает соединение в пул.
+        """
+        async with self.pool.acquire() as conn:
+            result = await conn.fetchval("""
+                SELECT is_banned FROM channel_memberships 
+                WHERE telegram_id = $1 AND channel_name = $2
+            """, telegram_id, channel_name)
+            return result if result is not None else False
+
+    async def get_user_channel_status(self, telegram_id: int, channel_name: str) -> Optional[dict]:
+        """
+        Get user's channel membership status
+        
+        ПОДКЛЮЧЕНИЕ: Получает соединение из пула, выполняет SELECT,
+        возвращает соединение в пул.
+        """
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow("""
+                SELECT * FROM channel_memberships 
+                WHERE telegram_id = $1 AND channel_name = $2
+            """, telegram_id, channel_name)
+            return dict(row) if row else None
+
+    async def get_all_users_for_verification(self) -> List[dict]:
+        """
+        Get all users who have ever had a subscription (need verification on startup)
+        
+        Returns users with their subscription and whitelist status for each channel.
+        """
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT DISTINCT 
+                    s.telegram_id, 
+                    s.channel_name,
+                    s.is_active,
+                    s.end_date,
+                    COALESCE(w.telegram_id IS NOT NULL, FALSE) as is_whitelisted,
+                    COALESCE(cm.is_banned, FALSE) as is_banned
+                FROM subscriptions s
+                LEFT JOIN whitelist w ON s.telegram_id = w.telegram_id AND s.channel_name = w.channel_name
+                LEFT JOIN channel_memberships cm ON s.telegram_id = cm.telegram_id AND s.channel_name = cm.channel_name
+                ORDER BY s.telegram_id, s.channel_name
+            """)
+            return [dict(row) for row in rows]
+
+    async def get_banned_users(self, channel_name: str = None) -> List[dict]:
+        """
+        Get all banned users, optionally filtered by channel
+        """
+        async with self.pool.acquire() as conn:
+            if channel_name:
+                rows = await conn.fetch("""
+                    SELECT cm.*, u.username, u.first_name, u.last_name
+                    FROM channel_memberships cm
+                    LEFT JOIN users u ON cm.telegram_id = u.telegram_id
+                    WHERE cm.channel_name = $1 AND cm.is_banned = TRUE
+                    ORDER BY cm.banned_at DESC
+                """, channel_name)
+            else:
+                rows = await conn.fetch("""
+                    SELECT cm.*, u.username, u.first_name, u.last_name
+                    FROM channel_memberships cm
+                    LEFT JOIN users u ON cm.telegram_id = u.telegram_id
+                    WHERE cm.is_banned = TRUE
+                    ORDER BY cm.channel_name, cm.banned_at DESC
                 """)
             return [dict(row) for row in rows]
 

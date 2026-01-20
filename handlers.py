@@ -28,9 +28,22 @@ router = Router()
 
 async def add_user_to_channel(bot: Bot, user_id: int, channel_id: str):
     """Add user to channel"""
+    # Determine channel_name from channel_id
+    if str(channel_id) == str(CHANNEL_1_ID):
+        channel_name = "channel_1"
+    elif str(channel_id) == str(CHANNEL_2_ID):
+        channel_name = "channel_2"
+    else:
+        channel_name = None
+    
     try:
         # Разбаниваем пользователя (если был забанен) - это позволяет ему присоединиться
         await bot.unban_chat_member(chat_id=channel_id, user_id=user_id, only_if_banned=False)
+        
+        # Update ban status in database
+        if channel_name:
+            await db.set_user_banned(user_id, channel_name, False)
+            logger.info(f"User {user_id} unbanned from {channel_name}")
         
         # Для приватных каналов создаем одноразовую ссылку-приглашение
         try:
@@ -43,16 +56,16 @@ async def add_user_to_channel(bot: Bot, user_id: int, channel_id: str):
             try:
                 await bot.send_message(
                     chat_id=user_id,
-                    text=f"🔗 Присоединяйтесь к каналу по ссылке:\n{invite_link.invite_link}"
+                    text=f"Присоединяйтесь к каналу по ссылке:\n{invite_link.invite_link}"
                 )
             except:
                 # Если не удалось отправить сообщение, ссылка все равно создана
                 pass
         except Exception as e:
             # Если не удалось создать ссылку (например, нет прав), просто разбаниваем
-            print(f"Note: Could not create invite link for {user_id}: {e}")
+            logger.warning(f"Note: Could not create invite link for {user_id}: {e}")
     except Exception as e:
-        print(f"Error adding user to channel {channel_id}: {e}")
+        logger.error(f"Error adding user to channel {channel_id}: {e}")
 
 async def remove_user_from_channel(bot: Bot, user_id: int, channel_id: str):
     """Remove user from channel"""

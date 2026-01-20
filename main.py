@@ -37,11 +37,17 @@ async def on_startup(bot: Bot):
     setup_scheduler(bot)
     logger.info("Scheduler started")
     
-    # Выполняем немедленную проверку истекших подписок при запуске
-    from scheduler import check_expired_subscriptions
+    # Выполняем проверку и верификацию всех подписок при запуске
+    from scheduler import check_expired_subscriptions, verify_all_subscriptions_on_startup
+    
     logger.info("Performing initial check of expired subscriptions...")
     await check_expired_subscriptions(bot)
-    logger.info("Initial check completed")
+    logger.info("Expired subscriptions check completed")
+    
+    # Verify all users - ban those without active subscriptions
+    logger.info("Verifying all user subscriptions...")
+    await verify_all_subscriptions_on_startup(bot)
+    logger.info("User verification completed")
 
 async def main():
     """Main function"""
