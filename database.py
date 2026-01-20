@@ -99,16 +99,28 @@ class Database:
                 )
             """)
             
-            # Channel memberships table - tracks user ban status per channel
+            # Channel memberships table - tracks user ban and whitelist status per channel
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS channel_memberships (
                     telegram_id BIGINT NOT NULL,
                     channel_name VARCHAR(50) NOT NULL,
                     is_banned BOOLEAN DEFAULT FALSE,
+                    is_whitelisted BOOLEAN DEFAULT FALSE,
                     banned_at TIMESTAMP,
                     last_verified TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY (telegram_id, channel_name)
                 )
+            """)
+            
+            # Add is_whitelisted column if it doesn't exist (migration for existing tables)
+            await conn.execute("""
+                DO $$ 
+                BEGIN 
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='channel_memberships' AND column_name='is_whitelisted') THEN
+                        ALTER TABLE channel_memberships ADD COLUMN is_whitelisted BOOLEAN DEFAULT FALSE;
+                    END IF;
+                END $$;
             """)
             
             # Создаем индексы для оптимизации
@@ -469,6 +481,19 @@ class Database:
                 VALUES ($1, $2)
                 ON CONFLICT (telegram_id, channel_name) DO NOTHING
             """, telegram_id, channel_name)
+            
+            # Sync with channel_memberships - mark as whitelisted and not banned
+            now = datetime.now()
+            await conn.execute("""
+                INSERT INTO channel_memberships (telegram_id, channel_name, is_banned, is_whitelisted, last_verified)
+                VALUES ($1, $2, FALSE, TRUE, $3)
+                ON CONFLICT (telegram_id, channel_name) 
+                DO UPDATE SET 
+                    is_whitelisted = TRUE,
+                    is_banned = FALSE,
+                    banned_at = NULL,
+                    last_verified = EXCLUDED.last_verified
+            """, telegram_id, channel_name, now)
 
     async def remove_whitelist_user(self, telegram_id: int, channel_name: str):
         """
@@ -482,6 +507,14 @@ class Database:
                 DELETE FROM whitelist 
                 WHERE telegram_id = $1 AND channel_name = $2
             """, telegram_id, channel_name)
+            
+            # Sync with channel_memberships - mark as not whitelisted
+            now = datetime.now()
+            await conn.execute("""
+                UPDATE channel_memberships 
+                SET is_whitelisted = FALSE, last_verified = $3
+                WHERE telegram_id = $1 AND channel_name = $2
+            """, telegram_id, channel_name, now)
 
     async def is_whitelisted(self, telegram_id: int, channel_name: str) -> bool:
         """
@@ -529,22 +562,26 @@ class Database:
     
     async def set_user_banned(self, telegram_id: int, channel_name: str, is_banned: bool):
         """
-        Set user ban status for a channel
+        Set user ban status for a channel. Also syncs whitelist status.
         
         ПОДКЛЮЧЕНИЕ: Получает соединение из пула, выполняет INSERT ... ON CONFLICT,
         возвращает соединение в пул.
         """
         async with self.pool.acquire() as conn:
             now = datetime.now()
+            # Check if user is whitelisted
+            is_whitelisted = await self.is_whitelisted(telegram_id, channel_name)
+            
             await conn.execute("""
-                INSERT INTO channel_memberships (telegram_id, channel_name, is_banned, banned_at, last_verified)
-                VALUES ($1, $2, $3, $4, $5)
+                INSERT INTO channel_memberships (telegram_id, channel_name, is_banned, is_whitelisted, banned_at, last_verified)
+                VALUES ($1, $2, $3, $4, $5, $6)
                 ON CONFLICT (telegram_id, channel_name) 
                 DO UPDATE SET 
                     is_banned = EXCLUDED.is_banned,
+                    is_whitelisted = EXCLUDED.is_whitelisted,
                     banned_at = CASE WHEN EXCLUDED.is_banned = TRUE THEN EXCLUDED.banned_at ELSE NULL END,
                     last_verified = EXCLUDED.last_verified
-            """, telegram_id, channel_name, is_banned, now if is_banned else None, now)
+            """, telegram_id, channel_name, is_banned, is_whitelisted, now if is_banned else None, now)
 
     async def is_user_banned(self, telegram_id: int, channel_name: str) -> bool:
         """
@@ -587,7 +624,7 @@ class Database:
                     s.channel_name,
                     s.is_active,
                     s.end_date,
-                    COALESCE(w.telegram_id IS NOT NULL, FALSE) as is_whitelisted,
+                    CASE WHEN w.telegram_id IS NOT NULL THEN TRUE ELSE FALSE END as is_whitelisted,
                     COALESCE(cm.is_banned, FALSE) as is_banned
                 FROM subscriptions s
                 LEFT JOIN whitelist w ON s.telegram_id = w.telegram_id AND s.channel_name = w.channel_name

@@ -127,6 +127,12 @@ async def verify_all_subscriptions_on_startup(bot: Bot):
         is_currently_banned = user_data['is_banned']
         end_date = user_data['end_date']
         
+        # Double-check whitelist status directly from DB (safety check)
+        is_whitelisted_check = await db.is_whitelisted(user_id, channel_name)
+        if is_whitelisted != is_whitelisted_check:
+            logger.warning(f"[STARTUP] Whitelist mismatch for user {user_id}: query={is_whitelisted}, direct={is_whitelisted_check}")
+            is_whitelisted = is_whitelisted_check
+        
         # Parse end_date if needed
         if isinstance(end_date, str):
             end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
@@ -139,11 +145,14 @@ async def verify_all_subscriptions_on_startup(bot: Bot):
         # Determine if user should be in channel
         should_be_in_channel = subscription_valid or is_whitelisted
         
+        logger.debug(f"[STARTUP] User {user_id} channel={channel_name}: active={is_active}, whitelisted={is_whitelisted}, valid={subscription_valid}, should_stay={should_be_in_channel}")
+        
         if should_be_in_channel:
             # User should be in channel - mark as not banned
             if is_currently_banned:
                 await db.set_user_banned(user_id, channel_name, False)
-                logger.info(f"[STARTUP] User {user_id} marked as not banned for {channel_name} (subscription valid or whitelisted)")
+                reason = "whitelisted" if is_whitelisted else "subscription valid"
+                logger.info(f"[STARTUP] User {user_id} marked as not banned for {channel_name} ({reason})")
             already_ok_count += 1
             continue
         
@@ -160,7 +169,7 @@ async def verify_all_subscriptions_on_startup(bot: Bot):
             await bot.ban_chat_member(chat_id=channel_id, user_id=user_id)
             await db.set_user_banned(user_id, channel_name, True)
             banned_count += 1
-            logger.info(f"[STARTUP] Banned user {user_id} from {channel_name} (no active subscription)")
+            logger.info(f"[STARTUP] Banned user {user_id} from {channel_name} (no active subscription, not whitelisted)")
             
             # Send message to user
             try:

@@ -103,7 +103,7 @@ UNIQUE(telegram_id, channel_name) );
 -- =====================================================
 -- 6. ТАБЛИЦА channel_memberships (статус участия в каналах)
 -- =====================================================
--- Отслеживание статуса бана пользователей в каналах
+-- Отслеживание статуса бана и whitelist пользователей в каналах
 CREATE TABLE IF NOT EXISTS channel_memberships (
     -- Составной PRIMARY KEY: один статус на пользователя и канал
     telegram_id BIGINT NOT NULL,
@@ -111,6 +111,9 @@ CREATE TABLE IF NOT EXISTS channel_memberships (
     
     -- Статус бана: TRUE = забанен, FALSE = не забанен
     is_banned BOOLEAN DEFAULT FALSE,
+    
+    -- Статус whitelist: TRUE = в whitelist (никогда не будет забанен), FALSE = обычный пользователь
+    is_whitelisted BOOLEAN DEFAULT FALSE,
     
     -- Дата и время бана (NULL если не забанен)
     banned_at TIMESTAMP,
@@ -193,13 +196,15 @@ COMMENT ON COLUMN reminders.reminder_date IS 'Дата и время отпра�
 COMMENT ON COLUMN reminders.reminder_sent IS 'Отправлено ли напоминание пользователю';
 
 -- Комментарии к таблице channel_memberships
-COMMENT ON TABLE channel_memberships IS 'Статус участия пользователей в каналах (бан/не бан)';
+COMMENT ON TABLE channel_memberships IS 'Статус участия пользователей в каналах (бан/whitelist)';
 
 COMMENT ON COLUMN channel_memberships.telegram_id IS 'ID пользователя в Telegram';
 
 COMMENT ON COLUMN channel_memberships.channel_name IS 'Название канала: channel_1 (Орден Демиургов) или channel_2 (Родители Демиурга)';
 
 COMMENT ON COLUMN channel_memberships.is_banned IS 'Забанен ли пользователь в канале';
+
+COMMENT ON COLUMN channel_memberships.is_whitelisted IS 'В whitelist ли пользователь (никогда не будет забанен)';
 
 COMMENT ON COLUMN channel_memberships.banned_at IS 'Дата и время бана (NULL если не забанен)';
 
